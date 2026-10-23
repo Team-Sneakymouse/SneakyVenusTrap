@@ -1,0 +1,17 @@
+name: EmptyPlugin
+version: '${version}'
+main: com.emptyplugin.EmptyPlugin
+description: Standard Paper plugin template for Team-Sneakymouse / Lords of Minecraft.
+api-version: '26.2'
+authors: [Team Sneakymouse]
+website: https://github.com/Team-Sneakymouse/EmptyPlugin
+dependencies:
+  server:
+    SneakyUtils:
+      load: BEFORE
+      required: true
+      join-classpath: true
+permissions:
+  emptyplugin.command.reload:
+    description: Reload the plugin configuration.
+    default: op
