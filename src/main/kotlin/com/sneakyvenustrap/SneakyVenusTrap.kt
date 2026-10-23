@@ -5,6 +5,10 @@ import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.bukkit.plugin.java.JavaPlugin
 
 open class SneakyVenusTrap : JavaPlugin() {
+    lateinit var encounters: com.sneakyvenustrap.encounter.Encounters
+        private set
+
+    private var voiceIntegration: AutoCloseable? = null
 
     companion object {
         const val IDENTIFIER = "sneakyvenustrap"
@@ -22,6 +26,10 @@ open class SneakyVenusTrap : JavaPlugin() {
     override fun onEnable() {
         saveDefaultConfig()
         reloadPlugin()
+        encounters = com.sneakyvenustrap.encounter.Encounters(this)
+        voiceIntegration = com.sneakyvenustrap.voice.VoiceIntegration.start(this, encounters)
+        server.pluginManager.registerEvents(com.sneakyvenustrap.encounter.EncounterEvents(encounters), this)
+        server.pluginManager.registerEvents(com.sneakyvenustrap.encounter.StomachEvents(this, encounters.stomachs), this)
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
             event.registrar().register(ReloadCommand(this).create(), "Reload the plugin configuration")
         }
@@ -34,6 +42,9 @@ open class SneakyVenusTrap : JavaPlugin() {
     }
 
     override fun onDisable() {
+        voiceIntegration?.close()
+        voiceIntegration = null
+        if (::encounters.isInitialized) encounters.close()
         logger.info("SneakyVenusTrap disabled.")
     }
 }

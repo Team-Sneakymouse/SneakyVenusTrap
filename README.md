@@ -1,48 +1,66 @@
 # SneakyVenusTrap
 
-Paper plugin for Team-Sneakymouse / Lords of Minecraft, created from the [EmptyPlugin template](https://github.com/Team-Sneakymouse/EmptyPlugin).
+A manually spawned Darkvale boss encounter for Paper 26.2 / Java 25. Built from the Team-Sneakymouse EmptyPlugin template; requires the pinned SneakyUtils runtime plugin.
 
-Initial setup only: gameplay requirements have not been supplied, and no gameplay mechanics are implemented. The existing configuration reload scaffold is retained.
+## Developer commands
 
-## Requirements and setup
+- `/sneakyvenustrap spawn` — operators only, in-game. Look at solid ground within 30 blocks. Spawns one stationary plant and its hunting garden. Gardens must be at least 40 blocks apart; maximum eight. Leave a clear area around and above the plant.
+- `/sneakyvenustrap remove` — operators only, in-game. Look at the ground beneath the encounter within 30 blocks. Removes the nearby garden and attempts to evacuate swallowed players. Failed evacuations retain recovery information for retry.
+- `/sneakyvenustrap reload` — permission `sneakyvenustrap.command.reload` (operators by default). Reloads configuration, not plugin code.
 
-- Paper 26.2 and Java 25.
-- Install SneakyUtils alongside this plugin; the pinned build dependency is in `build.gradle.kts`.
-- Build with `./gradlew jar`, then install the plugin JAR from `~/.cache/SneakyVenusTrap-gradle-build/libs/` in the server's `plugins/` folder.
-- Startup creates `plugins/SneakyVenusTrap/config.yml` from the currently empty default configuration.
+**No automatic spawn or respawn.** Killing the plant, chunk/world unload, removal and disable remove its transient entities. The developer must spawn it again. Do not use hot reload as a deployment method.
 
-## Configuration reload
+## Encounter
 
-Run `/sneakyvenustrap reload` in-game or `sneakyvenustrap reload` from the console. Permission: `sneakyvenustrap.command.reload` (operators by default). This reloads configuration only, not plugin code or the server. Startup and the command share `SneakyVenusTrap.reloadPlugin()`.
+- Giant vanilla BlockDisplay sculpture with green jaws, red mouth and pale teeth; no custom resource pack required. This is a functional prototype sculpture, not a finished bespoke animated character asset.
+- Running and microphone activity make players more attractive targets; sneaking lowers their noise score, not immunity. Creative/spectator players are not hunted.
+- Roots telegraph an eruption before a smaller mouth appears. Move away or attack during the shared throat-vulnerability window. All mouths share 400 health; accepted hits deal 10 damage with a half-second attack cooldown.
+- Sneak/right-click a mouth while holding the configured bribe item. One item is consumed per admitted attempt; success is exactly one in five. Success grants 15 seconds of truce. Each player has a 60-second bribe cooldown per garden.
+- Ordinary right-click attempts to claim configured bait. A genuine payout is rare and bounded; unconfigured bait is disabled rather than inventing a server collectible or executing a currency command.
+- Some successful hunting strikes swallow the target into a dedicated greenhouse-stomach room. Remember the original cry/visual soul cue and strike its flower. Correct flowers break throat knots; wrong flowers cause damage and digestion pressure. Three knots force escape. Allies hitting the exposed plant relieve pressure; solo escape is possible.
+
+## Configuration and assets
+
+The default `config.yml` deliberately has `bribe.item: null` and `lure.item: null`. Supply genuine Bukkit-serialized ItemStacks (including the real item's model/PDC) to enable those paths. No specific rare server item or economic value has been selected. No money integration or currency payout is included.
+
+`sounds.*` accepts Minecraft/resource-pack sound event identifiers. Vanilla sounds are the defaults. Final female/monstrous/stolen-voice performed audio is **not included**. No player voices are recorded, retained, cloned or replayed.
+
+Optional microphone detection integrates with Simple Voice Chat (API 2.5.27). It uses nearby public microphone activity metadata only; group conversations and empty/end packets do not attract the plant. Install a compatible `voicechat` runtime plugin and confirm startup logs; absence falls back to movement hunting. Microphone activity is not speech recognition or recording.
+
+## Player safety and persistence
+
+- Stomach construction writes only to the dedicated `sneakyvenustrap_stomach` void world, never the exterior map. The plugin refuses to take over an existing world without its ownership marker.
+- Return locations are journalled to `plugins/SneakyVenusTrap/captives.yml` before transfer. Failed evacuations retain recovery information. Keep this file and the stomach world until all captives are recovered.
+- Player inventories are never replaced. If a server stops with a captive inside, join/respawn recovery attempts a safe return.
+- Rewards reserve their global cap before inventory mutation. Keep `lure-ledger.yml` and player data; deleting them resets anti-farming history.
 
 ## Build and verification
 
 ```bash
-./gradlew test jar sourcesJar generatePomFileForMavenPublication publishPreflight
-./gradlew check
+./gradlew check jar sourcesJar generatePomFileForMavenPublication
 ```
 
-Tests cover plugin lifecycle, reload permissions, command completion and configuration reload, plus SneakyUtils text-helper smoke tests. They use JUnit 5 and MockBukkit, not a live server.
+Output: `~/.cache/SneakyVenusTrap-gradle-build/libs/SneakyVenusTrap-<version>.jar`. Install alongside SneakyUtils on a test server first. Do not select an older JAR left in this directory.
 
-Gradle output is under `~/.cache/SneakyVenusTrap-gradle-build`, avoiding FUSE/NTFS checkout issues. For a local Paper smoke test, `./gradlew runServer` stages required plugin dependencies from matching `compileOnly` JARs. Prefer a native-filesystem `run/` directory (or a symlink to `~/.cache/sneakyvenustrap-run`).
+Tests use JUnit and MockBukkit; they are not proof of client visuals, audible sound design, or a live multiplayer encounter. Inspect JUnit XML for aborted/skipped tests, not only Gradle's exit status.
 
-Initial setup is pending approval to update protected `AGENTS.md`: it still contains template identity and the EmptyPlugin-only testing exception, which intentionally blocks `templatePolicyPreflight` and therefore `check`. Do not bypass that guard or publish until the approved cleanup is complete.
+Existing local smoke tooling: `./gradlew resolveRunServerPlugins` checks staged dependencies; `./gradlew runServer` starts Paper with matching plugin dependencies. Paper's EULA must be accepted in the local run directory.
 
-## Versioning and publishing
+### In-game acceptance checklist
 
-Builds require a git checkout with at least one commit. Versions use the UTC commit date and 12-character HEAD hash: `yyyy.MM.dd-<12-char-git-hash>`. Uncommitted setup changes do not change that version.
+- Check the main head, teeth, stem and leaves from player height; verify reach/hitboxes and smaller mouth readability.
+- Spawn/remove as operator; verify non-operators cannot use either command. Check completions.
+- Sprint, walk, sneak and speak near the garden, separately. Confirm genuine microphone activity only when integration is available.
+- Dodge eruption telegraphs; damage an exposed mouth, kill the whole garden, and confirm no respawn.
+- Configure real test bait/bribe ItemStacks; verify one-in-five bribes, consumption/cooldowns and bounded rewards. Review economic values before production.
+- Get swallowed, follow original/echo cues, make a wrong choice, escape solo and receive outside help.
+- Exercise death, logout/rejoin, remove, chunk/world unload and server restart with a captive. Confirm safe recovery and no orphan displays.
+- Test a deliberately cancelled return teleport, restore teleport permission and confirm recovery retries.
 
-- Plugin JAR: `SneakyVenusTrap-<version>.jar`.
-- Maven coordinates: `io.github.team-sneakymouse:sneakyvenustrap:<version>`.
-- Repository: https://github.com/Team-Sneakymouse/SneakyVenusTrap
-- Maven releases: https://maven.sneakyrp.com/releases
+## Publication
 
-Pushes to `main` trigger `.github/workflows/publish.yml`: Java 25 build/check, Infisical OIDC Maven credentials, then `publishMavenPublicationToSneakyrpRepository`. The publication name remains `maven`; the POM marks this artifact as `paper-plugin`.
+Repository: https://github.com/Team-Sneakymouse/SneakyVenusTrap
 
-Public Team-Sneakymouse repositories inherit organization secrets `INFISICAL_IDENTITY_ID` and `INFISICAL_DOMAIN`. An authorized operator must confirm Infisical OIDC permits `Team-Sneakymouse/SneakyVenusTrap`; this initial setup does not modify or verify Infisical. Maven credentials are supplied only through environment/Gradle properties, never committed.
+Maven coordinate: `io.github.team-sneakymouse:sneakyvenustrap:<version>` from `https://maven.sneakyrp.com/releases`. Versions derive from commit UTC date and 12-character hash. Build again after committing for a matching artifact filename.
 
-`./gradlew publishPreflight` checks the wrapper executable mode, tracked wrapper JAR and publish workflow. `./gradlew check` additionally rejects the template-only AGENTS exception in renamed projects.
-
-## Contributor guidance
-
-Read [AGENTS.md](./AGENTS.md), including its shared policy pointer, before contributing. Gameplay specification and live-server verification remain pending.
+**Pushing `main` triggers publishing.** Feature work goes through PRs; merge/deployment require explicit authorization. Maven/Infisical credentials remain environment-only. Read [AGENTS.md](AGENTS.md) and its shared policy pointer before contributing.

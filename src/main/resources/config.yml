@@ -1,0 +1,15 @@
+# No live server item has been selected. Supply a genuine Bukkit-serialized ItemStack
+# including its item model/PDC; null means disabled. No economy commands are executed.
+bribe:
+  item: null
+lure:
+  item: null
+# Performed resource-pack sound event keys may replace these vanilla fallbacks.
+# Final female/monstrous/stolen-voice performances are NOT included.
+sounds:
+  warning: entity.warden.tendril_clicks
+  bite: entity.ravager.roar
+  hurt: entity.ghast.hurt
+  death: entity.ender_dragon.death
+  cry: entity.ghast.scream
+  echo: entity.ghast.scream

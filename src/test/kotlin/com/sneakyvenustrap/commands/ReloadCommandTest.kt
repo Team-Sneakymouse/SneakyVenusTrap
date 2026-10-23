@@ -29,6 +29,19 @@ class ReloadCommandTest {
     }
 
     @Test
+    fun devCommandsAreOperatorOnlyWithNativeCompletion() {
+        MockBukkit.load(SneakyVenusTrap::class.java)
+        server.dispatchCommand(server.consoleSender, "sneakyvenustrap")
+        val dispatcher = PaperCommandsMock.INSTANCE.dispatcherInternal
+        val player = server.addPlayer()
+        fun suggestions() = dispatcher.getCompletionSuggestions(dispatcher.parse("sneakyvenustrap ", CommandSourceStackMock.from(player))).join().list.map { it.text }
+        assertThrows(CommandSyntaxException::class.java) { dispatcher.execute("sneakyvenustrap spawn", CommandSourceStackMock.from(player)) }
+        player.isOp = true
+        assertEquals(listOf("reload", "remove", "spawn"), suggestions())
+        assertEquals(0, dispatcher.execute("sneakyvenustrap spawn", CommandSourceStackMock.from(server.consoleSender)))
+    }
+
+    @Test
     fun reloadLiteralHasNativeCompletion() {
         MockBukkit.load(SneakyVenusTrap::class.java)
         server.dispatchCommand(server.consoleSender, "sneakyvenustrap")
@@ -36,7 +49,7 @@ class ReloadCommandTest {
         val dispatcher = PaperCommandsMock.INSTANCE.dispatcherInternal
         val parsed = dispatcher.parse("sneakyvenustrap r", CommandSourceStackMock.from(server.consoleSender))
         val suggestions = dispatcher.getCompletionSuggestions(parsed).join().list.map { it.text }
-        assertEquals(listOf("reload"), suggestions)
+        assertEquals(listOf("reload", "remove"), suggestions)
     }
 
     @Test

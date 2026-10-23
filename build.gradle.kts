@@ -32,6 +32,7 @@ version =
 
 repositories {
     mavenCentral()
+    maven("https://maven.maxhenkel.de/repository/public")
     maven("https://repo.papermc.io/repository/maven-public/")
     // Internal Team-Sneakymouse / Lords of Minecraft artifacts:
     maven("https://maven.sneakyrp.com/releases")
@@ -194,10 +195,12 @@ fun resolveRunServerPluginJars(): List<File> {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:$paperApi")
+    compileOnly("de.maxhenkel.voicechat:voicechat-api:2.5.27")
     compileOnly("io.github.team-sneakymouse:sneakyutils:$sneakyUtilsVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.3.21")
 
     testImplementation("io.papermc.paper:paper-api:$paperApi")
+    testImplementation("de.maxhenkel.voicechat:voicechat-api:2.5.27")
     testImplementation("io.github.team-sneakymouse:sneakyutils:$sneakyUtilsVersion")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v26.2:$mockBukkitVersion")
