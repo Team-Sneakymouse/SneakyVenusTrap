@@ -1,17 +1,17 @@
-package com.emptyplugin.commands
+package com.sneakyvenustrap.commands
 
-import com.emptyplugin.EmptyPlugin
+import com.sneakyvenustrap.SneakyVenusTrap
 import com.mojang.brigadier.tree.LiteralCommandNode
 import io.papermc.paper.command.brigadier.CommandSourceStack
 import io.papermc.paper.command.brigadier.Commands
 
-class ReloadCommand(private val plugin: EmptyPlugin) {
+class ReloadCommand(private val plugin: SneakyVenusTrap) {
 
     fun create(): LiteralCommandNode<CommandSourceStack> =
-        Commands.literal(EmptyPlugin.IDENTIFIER)
+        Commands.literal(SneakyVenusTrap.IDENTIFIER)
             .then(
                 Commands.literal("reload")
-                    .requires { it.sender.hasPermission("${EmptyPlugin.IDENTIFIER}.command.reload") }
+                    .requires { it.sender.hasPermission("${SneakyVenusTrap.IDENTIFIER}.command.reload") }
                     .executes { context ->
                         plugin.reloadPlugin()
                         context.source.sender.sendMessage("${plugin.name} configuration reloaded.")

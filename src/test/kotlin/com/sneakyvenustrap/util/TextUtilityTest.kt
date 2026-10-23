@@ -1,4 +1,4 @@
-package com.emptyplugin.util
+package com.sneakyvenustrap.util
 
 import com.sneakyutils.util.TextUtility
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer

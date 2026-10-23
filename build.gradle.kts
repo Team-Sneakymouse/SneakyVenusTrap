@@ -306,14 +306,14 @@ tasks {
 publishing {
     publications {
         create<MavenPublication>("maven") {
-            artifactId = "emptyplugin"
+            artifactId = "sneakyvenustrap"
             from(components["java"])
             pom {
-                name.set("EmptyPlugin")
+                name.set("SneakyVenusTrap")
                 description.set(
-                    "Standard Paper plugin template for Team-Sneakymouse / Lords of Minecraft."
+                    "SneakyVenusTrap Paper plugin for Team-Sneakymouse / Lords of Minecraft."
                 )
-                url.set("https://github.com/Team-Sneakymouse/EmptyPlugin")
+                url.set("https://github.com/Team-Sneakymouse/SneakyVenusTrap")
                 properties.put("sneakyrp.deployment.type", "paper-plugin")
                 licenses {
                     license {
@@ -329,8 +329,8 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/Team-Sneakymouse/EmptyPlugin")
-                    connection.set("scm:git:https://github.com/Team-Sneakymouse/EmptyPlugin.git")
+                    url.set("https://github.com/Team-Sneakymouse/SneakyVenusTrap")
+                    connection.set("scm:git:https://github.com/Team-Sneakymouse/SneakyVenusTrap.git")
                 }
             }
         }

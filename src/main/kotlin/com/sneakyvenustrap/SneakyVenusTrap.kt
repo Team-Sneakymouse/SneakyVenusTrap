@@ -1,14 +1,14 @@
-package com.emptyplugin
+package com.sneakyvenustrap
 
-import com.emptyplugin.commands.ReloadCommand
+import com.sneakyvenustrap.commands.ReloadCommand
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.bukkit.plugin.java.JavaPlugin
 
-open class EmptyPlugin : JavaPlugin() {
+open class SneakyVenusTrap : JavaPlugin() {
 
     companion object {
-        const val IDENTIFIER = "emptyplugin"
-        lateinit var instance: EmptyPlugin
+        const val IDENTIFIER = "sneakyvenustrap"
+        lateinit var instance: SneakyVenusTrap
 
         fun log(message: String) {
             instance.logger.info(message)
@@ -25,7 +25,7 @@ open class EmptyPlugin : JavaPlugin() {
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
             event.registrar().register(ReloadCommand(this).create(), "Reload the plugin configuration")
         }
-        logger.info("EmptyPlugin enabled.")
+        logger.info("SneakyVenusTrap enabled.")
     }
 
     /** Shared configuration entry point for startup and reload. */
@@ -34,6 +34,6 @@ open class EmptyPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
-        logger.info("EmptyPlugin disabled.")
+        logger.info("SneakyVenusTrap disabled.")
     }
 }
