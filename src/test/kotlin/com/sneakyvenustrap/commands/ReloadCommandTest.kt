@@ -1,6 +1,6 @@
-package com.emptyplugin.commands
+package com.sneakyvenustrap.commands
 
-import com.emptyplugin.EmptyPlugin
+import com.sneakyvenustrap.SneakyVenusTrap
 import com.mojang.brigadier.exceptions.CommandSyntaxException
 import org.mockbukkit.mockbukkit.command.CommandSourceStackMock
 import org.mockbukkit.mockbukkit.command.brigadier.PaperCommandsMock
@@ -29,50 +29,63 @@ class ReloadCommandTest {
     }
 
     @Test
+    fun devCommandsAreOperatorOnlyWithNativeCompletion() {
+        MockBukkit.load(SneakyVenusTrap::class.java)
+        server.dispatchCommand(server.consoleSender, "sneakyvenustrap")
+        val dispatcher = PaperCommandsMock.INSTANCE.dispatcherInternal
+        val player = server.addPlayer()
+        fun suggestions() = dispatcher.getCompletionSuggestions(dispatcher.parse("sneakyvenustrap ", CommandSourceStackMock.from(player))).join().list.map { it.text }
+        assertThrows(CommandSyntaxException::class.java) { dispatcher.execute("sneakyvenustrap spawn", CommandSourceStackMock.from(player)) }
+        player.isOp = true
+        assertEquals(listOf("reload", "remove", "spawn"), suggestions())
+        assertEquals(0, dispatcher.execute("sneakyvenustrap spawn", CommandSourceStackMock.from(server.consoleSender)))
+    }
+
+    @Test
     fun reloadLiteralHasNativeCompletion() {
-        MockBukkit.load(EmptyPlugin::class.java)
-        server.dispatchCommand(server.consoleSender, "emptyplugin")
+        MockBukkit.load(SneakyVenusTrap::class.java)
+        server.dispatchCommand(server.consoleSender, "sneakyvenustrap")
 
         val dispatcher = PaperCommandsMock.INSTANCE.dispatcherInternal
-        val parsed = dispatcher.parse("emptyplugin r", CommandSourceStackMock.from(server.consoleSender))
+        val parsed = dispatcher.parse("sneakyvenustrap r", CommandSourceStackMock.from(server.consoleSender))
         val suggestions = dispatcher.getCompletionSuggestions(parsed).join().list.map { it.text }
-        assertEquals(listOf("reload"), suggestions)
+        assertEquals(listOf("reload", "remove"), suggestions)
     }
 
     @Test
     fun playerWithoutPermissionCannotReload() {
-        val plugin = MockBukkit.load(EmptyPlugin::class.java)
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         plugin.config.set("test-value", "before")
         File(plugin.dataFolder, "config.yml").writeText("test-value: after\n")
         val player = server.addPlayer()
 
-        server.dispatchCommand(player, "emptyplugin reload")
+        server.dispatchCommand(player, "sneakyvenustrap reload")
 
         assertEquals("before", plugin.config.getString("test-value"))
     }
 
     @Test
     fun playerWithPermissionCanReloadRepeatedly() {
-        val plugin = MockBukkit.load(EmptyPlugin::class.java)
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val player = server.addPlayer()
-        player.addAttachment(plugin, "emptyplugin.command.reload", true)
+        player.addAttachment(plugin, "sneakyvenustrap.command.reload", true)
 
         for (value in listOf("first", "second")) {
             File(plugin.dataFolder, "config.yml").writeText("test-value: $value\n")
-            assertTrue(server.dispatchCommand(player, "emptyplugin reload"))
+            assertTrue(server.dispatchCommand(player, "sneakyvenustrap reload"))
             assertEquals(value, plugin.config.getString("test-value"))
-            assertEquals("EmptyPlugin configuration reloaded.", player.nextMessage())
+            assertEquals("SneakyVenusTrap configuration reloaded.", player.nextMessage())
         }
     }
 
     @Test
     fun invalidArgumentsAreRejectedWithoutReloading() {
-        val plugin = MockBukkit.load(EmptyPlugin::class.java)
-        server.dispatchCommand(server.consoleSender, "emptyplugin")
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        server.dispatchCommand(server.consoleSender, "sneakyvenustrap")
         plugin.config.set("test-value", "before")
         File(plugin.dataFolder, "config.yml").writeText("test-value: after\n")
 
-        for (command in listOf("emptyplugin", "emptyplugin unknown", "emptyplugin reload extra")) {
+        for (command in listOf("sneakyvenustrap", "sneakyvenustrap unknown", "sneakyvenustrap reload extra")) {
             assertThrows(CommandSyntaxException::class.java) {
                 PaperCommandsMock.INSTANCE.dispatcherInternal.execute(
                     command,
@@ -85,14 +98,14 @@ class ReloadCommandTest {
 
     @Test
     fun consoleReloadReparsesConfigFromDisk() {
-        val plugin = MockBukkit.load(EmptyPlugin::class.java)
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         plugin.config.set("test-value", "before")
         File(plugin.dataFolder, "config.yml").writeText("test-value: after\n")
 
-        assertTrue(server.dispatchCommand(server.consoleSender, "emptyplugin reload"))
+        assertTrue(server.dispatchCommand(server.consoleSender, "sneakyvenustrap reload"))
 
         assertEquals("after", plugin.config.getString("test-value"))
-        assertEquals("EmptyPlugin configuration reloaded.", server.consoleSender.nextMessage())
+        assertEquals("SneakyVenusTrap configuration reloaded.", server.consoleSender.nextMessage())
         assertTrue(plugin.isEnabled)
     }
 }

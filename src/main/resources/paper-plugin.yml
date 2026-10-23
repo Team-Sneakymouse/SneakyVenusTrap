@@ -1,17 +1,21 @@
-name: EmptyPlugin
+name: SneakyVenusTrap
 version: '${version}'
-main: com.emptyplugin.EmptyPlugin
-description: Standard Paper plugin template for Team-Sneakymouse / Lords of Minecraft.
+main: com.sneakyvenustrap.SneakyVenusTrap
+description: SneakyVenusTrap Paper plugin for Team-Sneakymouse / Lords of Minecraft.
 api-version: '26.2'
 authors: [Team Sneakymouse]
-website: https://github.com/Team-Sneakymouse/EmptyPlugin
+website: https://github.com/Team-Sneakymouse/SneakyVenusTrap
 dependencies:
   server:
     SneakyUtils:
       load: BEFORE
       required: true
       join-classpath: true
+    voicechat:
+      load: BEFORE
+      required: false
+      join-classpath: true
 permissions:
-  emptyplugin.command.reload:
+  sneakyvenustrap.command.reload:
     description: Reload the plugin configuration.
     default: op
