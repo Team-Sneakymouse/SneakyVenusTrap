@@ -53,6 +53,7 @@ internal class TexturedPlant(private val origin: Location, private val register:
     var hinge = com.sneakyvenustrap.service.NeckGeometry.pose(Vector3f(), 0f, 0f).hinge
         private set
 
+    var raging = false
     var inhaling = false
 
     init { pose(Vector3f(), 0f, 26f, -22f, 0f) }
@@ -75,7 +76,7 @@ internal class TexturedPlant(private val origin: Location, private val register:
         }
         leaves.forEachIndexed { i, part ->
             val side = if (i < 3) -1 else 1
-            val angle = side * listOf(48, 80, 118)[i % 3] * (if (inhaling) 0.55f else 1f) + recoil * 20
+            val angle = side * listOf(48, 80, 118)[i % 3] * (if (inhaling) 0.55f else if (raging) 1.3f else 1f) + recoil * 20
             part.transformation = PlantModels.transform(Vector3f(side * 0.25f, 1.135f, 0.125f), Vector3f(),
                 Quaternionf().rotateZ(Math.toRadians(angle.toDouble()).toFloat()))
         }

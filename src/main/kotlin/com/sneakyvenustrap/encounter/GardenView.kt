@@ -89,6 +89,7 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
     }
 
     fun pose(aim: Location?, attack: com.sneakyvenustrap.service.PlantAttack) {
+        if (held) return
         val phase = attack.phase
         val elapsed = attack.elapsed
         lastAim = aim?.clone(); lastAttack = attack
@@ -136,5 +137,74 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
         }
     }
 
-    fun close() { bar.removeAll(); entities.forEach { it.remove() }; entities.clear(); mouths.clear(); head.clear() }
+    var held = false
+    private var raging = false
+    private var dramaAge = 0
+    private val bundles = mutableListOf<org.bukkit.entity.Display>()
+    private val lanes = mutableListOf<org.bukkit.entity.Display>()
+    private fun bundleAt(slot: Int) = origin.clone().add(
+        listOf(-2.0, 5.0, 1.5)[slot], 1.0, listOf(2.0, 2.0, -4.5)[slot])
+
+    private fun dramaPart(at: Location): org.bukkit.entity.Display =
+        if (textured) PlantModels.spawn(at, "vine_segment") { entities += it }
+        else PlantModels.owned(at, BlockDisplay::class.java, { entities += it }) {
+            it.isPersistent = false
+            it.block = Material.MANGROVE_ROOTS.createBlockData()
+        }
+
+    fun buildBundles() {
+        try {
+            repeat(3) {
+                val part = dramaPart(bundleAt(it).add(0.0, -0.8, 0.0))
+                bundles += part
+                part.transformation = Transformation(Vector3f(), Quaternionf().rotateZ(0.7f), Vector3f(1.2f), Quaternionf())
+            }
+        } catch (failure: Exception) { close(); throw failure }
+    }
+
+    fun absorbBundle(state: com.sneakyvenustrap.service.PlantDrama, swallowing: Boolean): Boolean {
+        val slot = bundles.indices.firstOrNull { state.bundleAvailable(it) && bundleAt(it).distanceSquared(contactCenter) <= 2.0 } ?: return false
+        return state.absorb(slot, swallowing)
+    }
+
+    /** Two open parallel strips, with the central escape corridor always clear. No blocks or colliders. */
+    fun drama(state: com.sneakyvenustrap.service.PlantDrama, players: List<org.bukkit.entity.Player>) {
+        dramaAge += 5
+        raging = state.raging
+        model?.raging = raging
+        if (!held && raging) lastAttack?.let { pose(lastAim, it) }
+        if (raging && dramaAge % 20 == 0) origin.world.spawnParticle(org.bukkit.Particle.DUST,
+            contactCenter, 8, 0.8, 0.8, 0.8, 0.0,
+            org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(160, 48, 205), 1.3f))
+        bundles.forEachIndexed { i, part ->
+            part.transformation = Transformation(Vector3f(), Quaternionf().rotateZ(0.7f),
+                Vector3f(if (state.bundleAvailable(i)) 1.2f else 0f), Quaternionf())
+            if (state.bundleAvailable(i) && dramaAge % 20 == 0) origin.world.spawnParticle(org.bukkit.Particle.COMPOSTER,
+                bundleAt(i), 3, 0.2, 0.3, 0.2, 0.0)
+        }
+        if (state.lanesVisible && lanes.isEmpty()) {
+            try {
+                for (x in listOf(-3.0, 6.0)) for (z in -1..4)
+                    lanes += dramaPart(origin.clone().add(x, 0.1, z.toDouble()))
+            } catch (failure: Exception) { close(); throw failure }
+        }
+        lanes.forEach { part ->
+            part.transformation = Transformation(Vector3f(), Quaternionf().rotateZ(1.57f),
+                if (state.lanesVisible) Vector3f(0.65f, 1.5f, 0.65f) else Vector3f(), Quaternionf())
+            if (state.lanesVisible) origin.world.spawnParticle(if (state.hazardActive) org.bukkit.Particle.CRIT else org.bukkit.Particle.COMPOSTER,
+                part.location, 2, 0.25, 0.2, 0.25, 0.0)
+        }
+        if (state.hazardActive) for (player in players) {
+            val p = player.location
+            val x = p.x - origin.x
+            val z = p.z - origin.z
+            if ((kotlin.math.abs(x + 3.0) <= 0.6 || kotlin.math.abs(x - 6.0) <= 0.6) &&
+                z in -1.5..4.5 && kotlin.math.abs(p.y - origin.y) <= 1.2 && state.hit(player.uniqueId.toString())) {
+                player.damage(2.0)
+                player.addPotionEffect(org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS, 15, 0))
+            }
+        }
+    }
+
+    fun close() { bar.removeAll(); entities.forEach { it.remove() }; entities.clear(); mouths.clear(); head.clear(); bundles.clear(); lanes.clear() }
 }

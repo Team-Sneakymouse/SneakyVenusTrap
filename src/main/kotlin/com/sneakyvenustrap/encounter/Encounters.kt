@@ -17,6 +17,8 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
         var target: UUID? = null
         var cycles = 0
         var swallowing = false
+        val drama = com.sneakyvenustrap.service.PlantDrama()
+        var pruningAt = 240
         val inhale = InhalePull()
         val attack = com.sneakyvenustrap.service.PlantAttack()
         var aim: Location? = null
@@ -36,6 +38,7 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
         if (at.y < at.world.minHeight + 1 || at.y + 12 >= at.world.maxHeight) return false
         val view = GardenView(at.clone(), plugin.config.getString("visuals.mode", "textured") != "block")
         view.build()
+        view.buildBundles()
         gardens += Encounter(view, random)
         return true
     }
@@ -72,6 +75,21 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
             if (!garden.view.origin.isChunkLoaded) { remove(garden); continue }
             val players = garden.view.origin.world.players.filter { eligible(it, garden) }
             val attack = garden.attack
+            val drama = garden.drama
+            drama.tick(garden.view.health.health / garden.view.health.maximumHealth)
+            val wasHeld = garden.view.held
+            garden.view.held = drama.staggerTicks > 0
+            if (wasHeld && !garden.view.held) garden.view.pose(null, attack)
+            if (drama.staggerTicks > 0) {
+                garden.inhale.close()
+                if (!renderDrama(garden, players)) continue
+                garden.view.updateBar(players, false)
+                continue
+            }
+            if (garden.age >= garden.pruningAt && players.isNotEmpty() && garden.vine == null && attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE) {
+                if (drama.prune()) garden.pruningAt = garden.age + 300
+            }
+            if (!renderDrama(garden, players)) continue
             val activeVine = garden.vine
             if (activeVine != null) {
                 val player = players.firstOrNull { it.uniqueId == activeVine.target }
@@ -83,20 +101,20 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
                 }
             }
             if (garden.anchor != null && players.none { it.uniqueId == garden.anchor!!.first }) garden.anchor = null
-            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null) {
+            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null && !garden.drama.lanesVisible) {
                 val target = players.filter { it.location.distanceSquared(garden.view.origin) <= 49 }
                     .maxByOrNull { Noise.score(it.isSprinting, it.isSneaking, microphoneActive(it.uniqueId)) }
                 if (target != null) {
                     garden.target = target.uniqueId
                     garden.aim = target.location.clone().add(0.0, 1.0, 0.0)
                     garden.swallowing = garden.cycles++ % 2 == 1
-                    attack.start(garden.swallowing)
+                    attack.start(garden.swallowing, drama.raging)
                     garden.view.origin.world.spawnParticle(if (garden.swallowing) Particle.SOUL else Particle.COMPOSTER,
                         garden.view.mouths.first().location, 16, 0.7, 0.5, 0.7, 0.02)
                     sound(target.location, "warning", "entity.warden.tendril_clicks", 0.7f)
                 }
             }
-            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null && now >= garden.vineCooldown) {
+            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null && !garden.drama.lanesVisible && now >= garden.vineCooldown) {
                 val distant = players.filter { it.location.distanceSquared(garden.view.origin) > 49 }
                     .maxByOrNull { Noise.score(it.isSprinting, it.isSneaking, microphoneActive(it.uniqueId)) }
                 if (distant != null) {
@@ -123,7 +141,14 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
                 garden.view.pose(garden.aim, attack)
                 // The committed snap exposes her throat even when the victim dodges it.
                 if (contact) garden.view.health.expose(45)
-                if (contact && victim != null && garden.aim != null && victim.location.clone().add(0.0, 1.0, 0.0).distanceSquared(garden.view.contactCenter) <= 4) {
+                val absorbed = contact && garden.view.absorbBundle(drama, garden.swallowing)
+                if (absorbed) {
+                    garden.inhale.close()
+                    garden.view.health.expose(60)
+                    garden.view.held = true
+                    attack.reset()
+                }
+                if (contact && !absorbed && victim != null && garden.aim != null && victim.location.clone().add(0.0, 1.0, 0.0).distanceSquared(garden.view.contactCenter) <= 4) {
                     if (garden.swallowing) {
                         if (!stomachs.swallow(victim, garden.id, garden.anchor?.takeIf { it.first == victim.uniqueId }?.second)) {
                             plugin.logger.warning("Main-head swallow failed: garden=${garden.id}, player=${victim.uniqueId}; see stomach diagnostic.")
@@ -135,6 +160,15 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
             garden.view.updateBar(players, garden.swallowing && attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.WINDUP)
         }
     }
+    private fun renderDrama(garden: Encounter, players: List<Player>): Boolean = try {
+        garden.view.drama(garden.drama, players)
+        true
+    } catch (failure: Exception) {
+        plugin.logger.warning("Exterior drama failed; removing garden=${garden.id}: ${failure.message}")
+        remove(garden)
+        false
+    }
+
     private fun sound(at: Location, key: String, fallback: String, pitch: Float) {
         at.world.playSound(at, plugin.config.getString("sounds.$key", fallback)!!, 1.3f, pitch)
     }
