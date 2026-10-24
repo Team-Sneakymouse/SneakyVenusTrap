@@ -60,16 +60,15 @@ class EncounterTest {
         val mouth = world.entities.filterIsInstance<org.bukkit.entity.Interaction>().first()
         assertTrue(plugin.encounters.attack(player, mouth.uniqueId))
         assertEquals(400.0, plugin.encounters.healthAt(player.location))
-        server.scheduler.performTicks(100)
         player.teleport(Location(world, 0.5, 64.0, 0.5))
-        server.scheduler.performTicks(20)
+        server.scheduler.performTicks(30)
         assertTrue(plugin.encounters.attack(player, mouth.uniqueId))
         assertEquals(390.0, plugin.encounters.healthAt(player.location))
         assertTrue(plugin.encounters.attack(player, mouth.uniqueId))
         assertEquals(390.0, plugin.encounters.healthAt(player.location), "no attack spam")
     }
 
-    @Test fun scheduledHuntTelegraphsEruptsAndExposesSharedHealth() {
+    @Test fun scheduledMainHeadContactExposesSharedHealthWithoutSatelliteMouths() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val world = server.addSimpleWorld("Darkvale")
         world.getBlockAt(0, 63, 0).type = Material.STONE
@@ -78,11 +77,9 @@ class EncounterTest {
         world.getChunkAt(0, 0).load()
         player.teleport(Location(world, 0.5, 64.0, 0.5))
         assertTrue(plugin.encounters.spawn(player.location))
-        server.scheduler.performTicks(100)
-        player.teleport(Location(world, 8.5, 64.0, 0.5))
-        server.scheduler.performTicks(25)
-        assertTrue(plugin.encounters.exposedAt(player.location), "telegraphed mouths open a vulnerability window")
-        assertTrue(world.entities.size > 50, "a small erupting mouth is rendered")
+        server.scheduler.performTicks(30)
+        assertTrue(plugin.encounters.exposedAt(player.location), "main-head contact opens a vulnerability window")
+        assertEquals(1, world.entities.filterIsInstance<org.bukkit.entity.Interaction>().size, "only the main head has a mouth")
         plugin.encounters.close()
         assertTrue(world.entities.filter { it !is org.bukkit.entity.Player }.isEmpty())
     }
@@ -95,7 +92,7 @@ class EncounterTest {
         val manager = plugin.encounters
         assertTrue(manager.spawn(at))
         assertEquals(1, manager.size)
-        assertTrue(world.entities.size > 20, "fallback sculpture includes visible jaws and teeth")
+        assertEquals(9, world.entities.filterIsInstance<org.bukkit.entity.ItemDisplay>().size, "single textured head, body and six leaves")
         assertTrue(manager.removeNear(at))
         assertEquals(0, manager.size)
         assertTrue(world.entities.isEmpty())

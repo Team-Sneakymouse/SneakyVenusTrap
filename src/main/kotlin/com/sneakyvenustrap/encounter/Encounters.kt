@@ -8,19 +8,23 @@ import org.bukkit.plugin.java.JavaPlugin
 import java.util.Random
 import java.util.UUID
 
-/** Single main-thread owner. At most eight gardens, one transient bud per garden, one bounded tick task. */
-class Encounters(private val plugin: JavaPlugin) {
+/** Single main-thread owner. At most eight gardens, one main head each, one bounded tick task. */
+class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomachs(plugin)) {
     private class Encounter(val view: GardenView, random: Random) {
         val id = UUID.randomUUID().toString()
         val bribes = Bribes(random, 1200, 300)
         var age = 0
         var target: UUID? = null
-        var warning: Location? = null
-        var bud: GardenView? = null
+        var cycles = 0
+        var swallowing = false
+        val attack = com.sneakyvenustrap.service.PlantAttack()
+        var aim: Location? = null
+        var vine: TunnellingVine? = null
+        var vineCooldown = 0L
+        var anchor: Pair<UUID, Location>? = null
     }
     private val random = Random()
     private val gardens = mutableListOf<Encounter>()
-    val stomachs = Stomachs(plugin)
     var microphoneActive: (UUID) -> Boolean = { false }
     private var now = 0L
     private val task = plugin.server.scheduler.runTaskTimer(plugin, Runnable { tick() }, 5, 5)
@@ -29,7 +33,7 @@ class Encounters(private val plugin: JavaPlugin) {
     fun spawn(at: Location): Boolean {
         if (stomachs.isArena(at.world) || gardens.size >= 8 || gardens.any { it.view.origin.world == at.world && it.view.origin.distanceSquared(at) < 1600 }) return false
         if (at.y < at.world.minHeight + 1 || at.y + 12 >= at.world.maxHeight) return false
-        val view = GardenView(at.clone())
+        val view = GardenView(at.clone(), plugin.config.getString("visuals.mode", "textured") != "block")
         view.build()
         gardens += Encounter(view, random)
         return true
@@ -44,7 +48,7 @@ class Encounters(private val plugin: JavaPlugin) {
     }
     private fun remove(found: Encounter) {
         stomachs.releaseGarden(found.id)
-        found.bud?.close()
+        found.vine?.close()
         found.view.close()
         gardens.remove(found)
         paidGardens.remove(found.id)
@@ -61,34 +65,68 @@ class Encounters(private val plugin: JavaPlugin) {
         for (garden in gardens.toList()) {
             garden.age += 5
             repeat(5) { garden.view.health.tick() }
+            garden.view.tickFeedback()
             // Do not load production chunks for a dormant encounter. Unload removes it instead.
             if (!garden.view.origin.isChunkLoaded) { remove(garden); continue }
             val players = garden.view.origin.world.players.filter { eligible(it, garden) }
-            if (garden.age % 100 == 0) {
-                garden.bud?.close(); garden.bud = null
-                val target = players.maxByOrNull {
-                    Noise.score(it.isSprinting, it.isSneaking, microphoneActive(it.uniqueId)) / (1 + it.location.distance(garden.view.origin))
-                }
-                garden.target = target?.uniqueId
-                garden.warning = target?.location?.clone()
-                if (target != null) {
-                    target.sendMessage("The roots hear you. The ground begins to split — MOVE!")
-                    garden.warning!!.world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, garden.warning!!, 25, 0.7, 0.2, 0.7, 0.0)
-                    sound(garden.warning!!, "warning", "entity.warden.tendril_clicks", 0.7f)
+            val attack = garden.attack
+            val activeVine = garden.vine
+            if (activeVine != null) {
+                val player = players.firstOrNull { it.uniqueId == activeVine.target }
+                if (!activeVine.tick(player)) {
+                    activeVine.close()
+                    garden.vine = null
+                    garden.vineCooldown = now + 100
+                    if (player == null || player.location.distanceSquared(garden.view.origin) > 49) garden.anchor = null
                 }
             }
-            if (garden.age % 100 == 20 && garden.warning != null) {
-                val at = garden.warning!!
-                val bud = GardenView(at.clone())
-                bud.jaw(at.clone(), 0.8)
-                bud.mouths += bud.hitbox(at, 2.5f, 2.5f)
-                garden.bud = bud
-                garden.view.health.expose(45)
-                sound(at, "bite", "entity.ravager.roar", 0.6f)
-                val target = plugin.server.getPlayer(garden.target!!)
-                if (target != null && target.world == at.world && target.location.distanceSquared(at) < 6.25 && eligible(target, garden)) {
-                    // A failed optional arena never strands players; the bite still works.
-                    if (random.nextInt(4) != 0 || !stomachs.swallow(target, garden.id)) target.damage(if (target.isSprinting) 6.0 else 3.0)
+            if (garden.anchor != null && players.none { it.uniqueId == garden.anchor!!.first }) garden.anchor = null
+            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null) {
+                val target = players.filter { it.location.distanceSquared(garden.view.origin) <= 49 }
+                    .maxByOrNull { Noise.score(it.isSprinting, it.isSneaking, microphoneActive(it.uniqueId)) }
+                if (target != null) {
+                    garden.target = target.uniqueId
+                    garden.aim = target.location.clone().add(0.0, 1.0, 0.0)
+                    garden.swallowing = garden.cycles++ % 2 == 1
+                    attack.start(garden.swallowing)
+                    target.sendMessage(if (garden.swallowing) "Her throat opens — SWALLOW incoming! Escape the main jaws!" else "The main head draws back to BITE — dodge!")
+                    sound(target.location, "warning", "entity.warden.tendril_clicks", 0.7f)
+                }
+            }
+            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null && now >= garden.vineCooldown) {
+                val distant = players.filter { it.location.distanceSquared(garden.view.origin) > 49 }
+                    .maxByOrNull { Noise.score(it.isSprinting, it.isSneaking, microphoneActive(it.uniqueId)) }
+                if (distant != null) {
+                    garden.vineCooldown = now + 100
+                    val route = VineTerrain.route(garden.view.origin.clone().add(1.5, 0.0, 1.5), distant.location)
+                    if (route == null) distant.sendMessage("The tunnelling roots recoil from impassable ground.")
+                    else {
+                        garden.vine = TunnellingVine(garden.view, distant.uniqueId, route) { player ->
+                            val safe = stomachs.prepareAnchor(player) ?: return@TunnellingVine false
+                            garden.anchor = player.uniqueId to safe
+                            true
+                        }
+                        distant.sendMessage("Roots tunnel from the Mother toward you — move away!")
+                        garden.vine!!.tick(distant)
+                    }
+                }
+            }
+            val victim = garden.target?.let { plugin.server.getPlayer(it) }
+            val valid = victim != null && victim.isOnline && victim.world == garden.view.origin.world && eligible(victim, garden)
+            if (attack.phase != com.sneakyvenustrap.service.PlantAttack.Phase.IDLE) {
+                val contact = attack.tick(valid)
+                garden.view.pose(garden.aim, attack.phase, attack.elapsed, garden.swallowing)
+                // The committed snap exposes her throat even when the victim dodges it.
+                if (contact) garden.view.health.expose(45)
+                if (contact && victim != null && garden.aim != null && victim.location.clone().add(0.0, 1.0, 0.0).distanceSquared(garden.aim!!) <= 4) {
+                    if (garden.swallowing) {
+                        if (stomachs.swallow(victim, garden.id, garden.anchor?.takeIf { it.first == victim.uniqueId }?.second)) victim.sendMessage("The main jaws close. You have been swallowed!")
+                        else {
+                            victim.sendMessage("Her throat convulses; the swallow fails!")
+                            plugin.logger.warning("Main-head swallow failed: garden=${garden.id}, player=${victim.uniqueId}; see stomach diagnostic.")
+                        }
+                    } else victim.damage(if (victim.isSprinting) 6.0 else 3.0)
+                    sound(garden.aim!!, "bite", "entity.ravager.roar", 0.6f)
                 }
             }
             if (now % 20 == 0L) players.forEach {
@@ -103,8 +141,8 @@ class Encounters(private val plugin: JavaPlugin) {
     private val lures = Lures(plugin, random)
     private val paidGardens = mutableSetOf<String>()
     fun interact(player: Player, entity: UUID): Boolean {
-        val garden = gardens.firstOrNull { g -> (g.view.mouths + (g.bud?.mouths ?: emptyList())).any { it.uniqueId == entity } } ?: return false
-        val mouth = (garden.view.mouths + (garden.bud?.mouths ?: emptyList())).first { it.uniqueId == entity }
+        val garden = gardens.firstOrNull { g -> g.view.mouths.any { it.uniqueId == entity } } ?: return false
+        val mouth = garden.view.mouths.first { it.uniqueId == entity }
         if (player.world != mouth.world || player.location.distanceSquared(mouth.location) > 36 || player.isDead || stomachs.contains(player.uniqueId)) return true
         if (player.isSneaking) {
             val offered = plugin.config.getItemStack("bribe.item")
@@ -141,20 +179,21 @@ class Encounters(private val plugin: JavaPlugin) {
         if (player.isDead || player.gameMode == GameMode.SPECTATOR || player.world != target.world ||
             player.location.distanceSquared(target.location) > 36) return true
         // Captives may strike their puzzle flowers, never the exterior shared-health garden.
-        val isGarden = gardens.any { g -> (g.view.mouths + (g.bud?.mouths ?: emptyList())).any { it.uniqueId == entity } }
+        val isGarden = gardens.any { g -> g.view.mouths.any { it.uniqueId == entity } }
         if (stomachs.contains(player.uniqueId) && isGarden) return true
         if (!isGarden && !stomachs.contains(player.uniqueId)) return false
         val authorization = EncounterAttackAuthorizationEvent(player, target)
         plugin.server.pluginManager.callEvent(authorization)
         if (authorization.isCancelled || !authorization.finalDamage.isFinite() || authorization.finalDamage <= 0) return true
         if (stomachs.strike(player, entity)) return true
-        val garden = gardens.firstOrNull { g -> (g.view.mouths + (g.bud?.mouths ?: emptyList())).any { it.uniqueId == entity } } ?: return false
-        val mouth = (garden.view.mouths + (garden.bud?.mouths ?: emptyList())).first { it.uniqueId == entity }
+        val garden = gardens.firstOrNull { g -> g.view.mouths.any { it.uniqueId == entity } } ?: return false
+        val mouth = garden.view.mouths.first { it.uniqueId == entity }
         if (player.world != mouth.world || player.location.distanceSquared(mouth.location) > 36 ||
             now - (lastAttack[player.uniqueId] ?: -20) < 10) return true
         if (garden.view.health.hit(authorization.finalDamage)) {
             lastAttack[player.uniqueId] = now
             stomachs.help(garden.id)
+            garden.view.hurt(garden.view.health.exposedTicks > 0)
             sound(mouth.location, "hurt", "entity.ghast.hurt", 0.6f)
             if (garden.view.health.dead) { sound(garden.view.origin, "death", "entity.ender_dragon.death", 0.5f); remove(garden) }
         }
@@ -163,7 +202,7 @@ class Encounters(private val plugin: JavaPlugin) {
 
     fun unload(world: World) { gardens.filter { it.view.origin.world == world }.toList().forEach(::remove) }
     fun unload(chunk: Chunk) {
-        gardens.filter { g -> (g.view.entities + (g.bud?.entities ?: emptyList())).any { it.world == chunk.world && it.location.blockX shr 4 == chunk.x && it.location.blockZ shr 4 == chunk.z } }
+        gardens.filter { g -> g.view.entities.any { it.world == chunk.world && it.location.blockX shr 4 == chunk.x && it.location.blockZ shr 4 == chunk.z } }
             .toList().forEach(::remove)
     }
     fun close() {

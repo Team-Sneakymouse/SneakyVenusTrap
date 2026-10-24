@@ -21,6 +21,40 @@ class StomachTest {
             catch (error: java.lang.reflect.InvocationTargetException) { throw error.targetException }
         } as org.bukkit.entity.Player
 
+    @Test fun arenaConstructionFailureCancelsWithoutMovingOrJournallingPlayer() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("broken-arena")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        val broken = java.lang.reflect.Proxy.newProxyInstance(javaClass.classLoader, arrayOf(org.bukkit.World::class.java)) { _, method, args ->
+            if (method.name == "getBlockAt") throw IllegalStateException("Injected arena construction failure")
+            try { method.invoke(arena, *(args ?: emptyArray())) }
+            catch (error: java.lang.reflect.InvocationTargetException) { throw error.targetException }
+        } as org.bukkit.World
+        val stomach = Stomachs(plugin) { broken }
+        assertFalse(stomach.swallow(player, "garden"))
+        assertEquals(outside, player.world)
+        assertFalse(stomach.contains(player.uniqueId))
+        assertNull(stomach.returnForRespawn(player.uniqueId))
+        assertTrue(arena.entities.isEmpty())
+    }
+
+    @Test fun airborneCaptureKeepsSafeExteriorAnchor() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 67.0, 0.5))
+        val stomach = Stomachs(plugin) { arena }
+        assertTrue(stomach.swallow(player, "garden"), "bounded downward search must find the floor below an airborne victim")
+        assertEquals(arena, player.world)
+        assertTrue(stomach.release(player))
+        assertEquals(64.0, player.location.y)
+    }
+
     @Test fun postTeleportCueFailureEvacuatesBeforeDiscardingCaptive() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")

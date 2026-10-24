@@ -27,18 +27,22 @@ class EncounterDeathTest {
         assertTrue(plugin.encounters.spawn(origin))
         val mouth = world.entities.filterIsInstance<Interaction>().first()
         repeat(40) { hit ->
-            // Audible target selection happens before eruption; creative mode prevents
-            // damage/swallow during this combat-only test without bypassing attacks.
-            player.gameMode = GameMode.SURVIVAL
-            server.scheduler.performTicks(if (hit == 0) 100 else 80)
+            // Contact exposes the only main head. Cancel the following recovery/attack
+            // while striking, and wait out that window before admitting another target.
             player.gameMode = GameMode.CREATIVE
-            server.scheduler.performTicks(20)
+            server.scheduler.performTicks(50)
+            player.health = 20.0
+            player.gameMode = GameMode.SURVIVAL
+            var waited = 0
+            while (!plugin.encounters.exposedAt(origin) && waited++ < 30) server.scheduler.performTicks(5)
+            player.gameMode = GameMode.CREATIVE
+            server.scheduler.performTicks(5)
             assertTrue(plugin.encounters.exposedAt(origin))
             assertTrue(plugin.encounters.attack(player, mouth.uniqueId))
             if (hit < 39) assertEquals(400.0 - (hit + 1) * 10.0, plugin.encounters.healthAt(origin))
         }
         assertEquals(0, plugin.encounters.size)
-        assertTrue(world.entities.filterNot { it is Player }.isEmpty(), "all main/bud displays and hitboxes removed")
+        assertTrue(world.entities.filterNot { it is Player }.isEmpty(), "all main-head displays and hitboxes removed")
         server.scheduler.performTicks(500)
         assertEquals(0, plugin.encounters.size, "only a developer can respawn the encounter")
         assertTrue(world.entities.filterNot { it is Player }.isEmpty())

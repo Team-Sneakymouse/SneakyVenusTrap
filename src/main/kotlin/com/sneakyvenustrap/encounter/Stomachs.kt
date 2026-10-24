@@ -30,26 +30,29 @@ class Stomachs(private val plugin: JavaPlugin, private val worldFactory: () -> W
     fun isArena(world: World) = world == arena || world.name == WORLD
     fun originalFlower(id: UUID): UUID? = captives[id]?.let { it.flowers[it.puzzle.original].uniqueId }
 
-    fun swallow(player: Player, garden: String): Boolean {
+    /** Snapshot before exterior drag/lift. No world writes or recovery I/O until actual swallow. */
+    fun prepareAnchor(player: Player): Location? = safe(player.location)
+
+    fun swallow(player: Player, garden: String, anchor: Location? = null): Boolean {
         if (contains(player.uniqueId) || isArena(player.world) || player.isDead || captives.size >= 16) return false
-        val destination = safe(player.location) ?: return false
+        val destination = safe(anchor?.takeIf { it.world == player.world } ?: player.location) ?: return false
         val world = try { arena ?: worldFactory().also { arena = it } } catch (error: Exception) {
             plugin.logger.severe("Stomach unavailable; swallow cancelled: ${error.message}"); return false
         }
         val slot = (0..15).first { candidate -> captives.values.none { it.slot == candidate } }
         val center = Location(world, slot * 32.0 + 8.5, 65.0, 8.5)
-        // Small sealed greenhouse: a genuine walkable room, isolated from all production blocks.
-        for (x in -4..4) for (z in -4..4) for (y in -1..4) {
-            val edge = x == -4 || x == 4 || z == -4 || z == 4
-            center.clone().add(x.toDouble(), y.toDouble(), z.toDouble()).block.type = when {
-                y == -1 -> Material.MOSS_BLOCK
-                y == 4 -> Material.RED_STAINED_GLASS
-                edge -> if (y == 0) Material.MUD_BRICKS else Material.GREEN_STAINED_GLASS
-                else -> Material.AIR
-            }
-        }
         val flowers = mutableListOf<Interaction>()
         try {
+            // Small sealed greenhouse: a genuine walkable room, isolated from all production blocks.
+            for (x in -4..4) for (z in -4..4) for (y in -1..4) {
+                val edge = x == -4 || x == 4 || z == -4 || z == 4
+                center.clone().add(x.toDouble(), y.toDouble(), z.toDouble()).block.type = when {
+                    y == -1 -> Material.MOSS_BLOCK
+                    y == 4 -> Material.RED_STAINED_GLASS
+                    edge -> if (y == 0) Material.MUD_BRICKS else Material.GREEN_STAINED_GLASS
+                    else -> Material.AIR
+                }
+            }
             for ((x, z) in listOf(-2 to -2, 2 to -2, 2 to 2, -2 to 2)) {
                 val at = center.clone().add(x.toDouble(), 0.0, z.toDouble())
                 at.block.type = Material.WITHER_ROSE
@@ -144,7 +147,7 @@ class Stomachs(private val plugin: JavaPlugin, private val worldFactory: () -> W
 
     private fun safe(at: Location): Location? {
         val world = at.world
-        for (radius in 0..4) for (x in -radius..radius) for (z in -radius..radius) for (dy in 0..4) {
+        for (radius in 0..4) for (x in -radius..radius) for (z in -radius..radius) for (dy in listOf(0, -1, 1, -2, 2, -3, 3, -4, 4)) {
             val candidate = at.clone().add(x.toDouble(), dy.toDouble(), z.toDouble())
             val feet = candidate.block
             val floor = feet.getRelative(0, -1, 0)
