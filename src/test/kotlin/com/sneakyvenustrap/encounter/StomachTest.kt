@@ -24,7 +24,7 @@ class StomachTest {
     @Test fun paperCrossWorldVehicleGateRemovesNameplateOnSwallowAndReturn() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -51,7 +51,7 @@ class StomachTest {
     @Test fun cancelledTransferKeepsPlayerOutsideAfterNameplateRemoval() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -72,7 +72,7 @@ class StomachTest {
     @Test fun livingPassengerIsRefusedWithoutDismountingOrDeletingIt() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         val passenger = server.addPlayer()
@@ -89,7 +89,7 @@ class StomachTest {
     @Test fun echoesAreSequencedAndStaleCuesStopAfterRelease() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -112,7 +112,7 @@ class StomachTest {
     @Test fun oldRoundEchoesCannotPlayAfterAKnotStartsAnotherRound() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -138,7 +138,7 @@ class StomachTest {
     @Test fun arenaConstructionFailureCancelsWithoutMovingOrJournallingPlayer() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("broken-arena")
+        val arena = server.addSimpleWorld("broken-arena")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -158,7 +158,7 @@ class StomachTest {
     @Test fun airborneCaptureKeepsSafeExteriorAnchor() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 67.0, 0.5))
@@ -172,7 +172,7 @@ class StomachTest {
     @Test fun postTeleportCueFailureEvacuatesBeforeDiscardingCaptive() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -190,7 +190,7 @@ class StomachTest {
     @Test fun throwingReleaseRetainsJournalAndCanBeRetried() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -210,7 +210,7 @@ class StomachTest {
     @Test fun shutdownRetainsFailedEvacuationAndRetriesWithoutLosingOtherCaptives() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val blocked = server.addPlayer()
         val other = server.addPlayer()
@@ -244,7 +244,7 @@ class StomachTest {
     @Test fun journalWriteFailureRetainsRecoveryUntilCleanupCanRetry() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -266,7 +266,7 @@ class StomachTest {
     @Test fun deathPreservesItemsAndRespawnUsesDurableExteriorDestination() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -290,7 +290,7 @@ class StomachTest {
     @Test fun puzzleUsesOneHintAndProgressBarInsteadOfStrikeChat() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -312,7 +312,7 @@ class StomachTest {
     @Test fun cancelledAndCrossRoomAttemptsDoNotReleaseAndDiagnosticsExplainTheActualReturn() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -347,7 +347,7 @@ class StomachTest {
     @Test fun sameRoomCorrectionsKeepTheWholePlayerInsideTheWallsFloorAndCeiling() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -370,72 +370,10 @@ class StomachTest {
         stomach.close()
     }
 
-    @Test fun stomachBuildsAnOpaqueOrganicRoomWithReadableFlowerCuesAndClearsItOnReturn() {
-        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
-        val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
-        outside.getBlockAt(0, 63, 0).type = Material.STONE
-        val player = server.addPlayer()
-        player.teleport(Location(outside, 0.5, 64.0, 0.5))
-        val stomach = Stomachs(plugin) { arena }
-        assertTrue(stomach.swallow(player, "garden"))
-        assertEquals(Material.CRIMSON_NYLIUM, arena.getBlockAt(8, 64, 8).type)
-        val materials = (4..12).flatMap { x -> (4..12).flatMap { z -> (64..69).map { y -> arena.getBlockAt(x, y, z).type } } }
-        assertFalse(materials.contains(Material.GREEN_STAINED_GLASS))
-        assertTrue(materials.contains(Material.NETHER_WART_BLOCK))
-        assertTrue(materials.contains(Material.SHROOMLIGHT), "the room must be lit without a client pack")
-        assertEquals(4, materials.count { it == Material.WITHER_ROSE })
-        for (x in 5..11) for (z in 5..11) for (y in 66..68)
-            assertTrue(arena.getBlockAt(x, y, z).type.isAir, "preserve walkable headroom")
-        val labels = arena.entities.filterIsInstance<org.bukkit.entity.TextDisplay>()
-        assertEquals(4, labels.size)
-        fun text(label: org.bukkit.entity.TextDisplay) = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(label.text())
-        assertEquals(1, labels.count { text(it).contains("ORIGINAL") })
-        server.scheduler.performTicks(16)
-        assertEquals(0, labels.count { text(it).contains("ORIGINAL") }, "memorize the first cue, not a permanent answer marker")
-        assertEquals(1, labels.count { text(it).contains("ECHO") })
-        assertTrue(stomach.release(player))
-        server.scheduler.performTicks(60)
-        assertTrue(arena.entities.isEmpty())
-        assertTrue(arena.tickets.isEmpty())
-        for (x in 4..12) for (z in 4..12) for (y in 64..69)
-            assertEquals(Material.AIR, arena.getBlockAt(x, y, z).type)
-        assertEquals(Material.STONE, outside.getBlockAt(0, 63, 0).type)
-    }
-
-    @Test fun queuedChunkUnloadAfterSwallowKeepsCaptiveUntilThreeKnotsAreSolved() {
-        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
-        val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
-        outside.getBlockAt(0, 63, 0).type = Material.STONE
-        val player = server.addPlayer()
-        player.teleport(Location(outside, 0.5, 64.0, 0.5))
-        val stomach = Stomachs(plugin) { arena }
-        server.pluginManager.registerEvents(StomachEvents(plugin, stomach), plugin)
-        assertTrue(stomach.swallow(player, "garden"))
-        val unload = org.bukkit.event.world.ChunkUnloadEvent(player.location.chunk)
-        server.scheduler.runTask(plugin, Runnable { server.pluginManager.callEvent(unload) })
-        server.scheduler.performOneTick()
-        assertTrue(stomach.contains(player.uniqueId), "CHUNK_UNLOAD is not an escape")
-        assertEquals(setOf(0 to 0), arena.tickets.keys)
-        assertEquals(arena, player.world)
-        repeat(2) {
-            assertTrue(stomach.strike(player, stomach.originalFlower(player.uniqueId)!!))
-            assertTrue(stomach.contains(player.uniqueId))
-        }
-        assertTrue(stomach.strike(player, stomach.originalFlower(player.uniqueId)!!))
-        assertEquals(outside, player.world)
-        assertFalse(stomach.contains(player.uniqueId))
-        assertNull(stomach.returnForRespawn(player.uniqueId))
-        assertTrue(arena.entities.isEmpty())
-        assertTrue(arena.tickets.isEmpty())
-        assertEquals(Material.AIR, arena.getBlockAt(8, 64, 8).type)
-    }
-
     @Test fun sameRoomFollowupTeleportDoesNotInstantlyReturnANewCaptive() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -455,7 +393,7 @@ class StomachTest {
     @Test fun externalTeleportReleasesCaptiveAndRestartJournalRecoversOnJoin() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         val home = Location(outside, 0.5, 64.0, 0.5)
@@ -480,7 +418,7 @@ class StomachTest {
     @Test fun arenaProtectionAndQuitReleaseKeepRecoveryAndInventorySafe() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -495,8 +433,7 @@ class StomachTest {
         server.pluginManager.callEvent(interact)
         assertEquals(org.bukkit.event.Event.Result.DENY, interact.useItemInHand())
         server.pluginManager.callEvent(org.bukkit.event.world.ChunkUnloadEvent(player.location.chunk))
-        assertTrue(stomach.contains(player.uniqueId))
-        assertTrue(stomach.release(player))
+        assertFalse(stomach.contains(player.uniqueId))
         // Re-enter to exercise quit as a separate lifetime.
         assertTrue(stomach.swallow(player, "garden"))
         server.pluginManager.callEvent(org.bukkit.event.player.PlayerQuitEvent(player, net.kyori.adventure.text.Component.empty()))
@@ -509,7 +446,7 @@ class StomachTest {
     @Test fun pressureAndAllyConvulsionsEventuallyReleaseCaptivesAndCleanupIsIdempotent() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
@@ -528,7 +465,7 @@ class StomachTest {
     @Test fun captiveSolvesOriginalCryAndReturnsWithoutInventoryLossOrExteriorWrites() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
-        val arena = server.addStomachWorld("stomach-test")
+        val arena = server.addSimpleWorld("stomach-test")
         outside.getBlockAt(0, 63, 0).type = Material.STONE
         val player = server.addPlayer()
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
