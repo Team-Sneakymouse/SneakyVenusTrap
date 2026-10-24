@@ -17,9 +17,7 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
     private var recoilTicks = 0
     private var recoilStrength = 0f
     private var lastAim: Location? = null
-    private var lastPhase = com.sneakyvenustrap.service.PlantAttack.Phase.IDLE
-    private var lastElapsed = 0
-    private var lastSwallowing = false
+    private var lastAttack: com.sneakyvenustrap.service.PlantAttack? = null
 
     fun hurt(vulnerable: Boolean) {
         recoilTicks = maxOf(recoilTicks, if (vulnerable) 40 else 20)
@@ -27,17 +25,26 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
         origin.world.spawnParticle(org.bukkit.Particle.DUST, mouths.first().location.clone().add(0.0, 1.0, 0.0),
             if (vulnerable) 18 else 8, 0.45, 0.4, 0.45, 0.0,
             org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(119, 169, 36), 1.3f))
-        pose(lastAim, lastPhase, lastElapsed, lastSwallowing)
+        lastAttack?.let { pose(lastAim, it) }
     }
     fun tickFeedback() {
         if (recoilTicks == 0) return
         recoilTicks = (recoilTicks - 5).coerceAtLeast(0)
         if (recoilTicks == 0) recoilStrength = 0f
-        pose(lastAim, lastPhase, lastElapsed, lastSwallowing)
+        lastAttack?.let { pose(lastAim, it) }
     }
     val entities = mutableListOf<Entity>()
     val mouths = mutableListOf<Interaction>()
     val health = Garden(400.0)
+    internal val bar = org.bukkit.Bukkit.createBossBar("The Mother", org.bukkit.boss.BarColor.GREEN, org.bukkit.boss.BarStyle.SOLID)
+
+    fun updateBar(players: List<org.bukkit.entity.Player>, swallowing: Boolean) {
+        bar.players.filter { it !in players || !it.isOnline || it.world != origin.world }.forEach(bar::removePlayer)
+        players.filter { it !in bar.players }.forEach(bar::addPlayer)
+        bar.progress = (health.health / health.maximumHealth).coerceIn(0.0, 1.0)
+        bar.setTitle(if (swallowing) "The Mother • Hungry inhale" else if (health.exposedTicks > 0) "The Mother • Throat exposed" else "The Mother • Armoured roots")
+        bar.color = if (swallowing) org.bukkit.boss.BarColor.PURPLE else org.bukkit.boss.BarColor.GREEN
+    }
 
     fun build() {
         try {
@@ -81,21 +88,20 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
         }
     }
 
-    fun pose(aim: Location?, phase: com.sneakyvenustrap.service.PlantAttack.Phase, elapsed: Int, swallowing: Boolean = false) {
-        lastAim = aim?.clone(); lastPhase = phase; lastElapsed = elapsed; lastSwallowing = swallowing
+    fun pose(aim: Location?, attack: com.sneakyvenustrap.service.PlantAttack) {
+        val phase = attack.phase
+        val elapsed = attack.elapsed
+        lastAim = aim?.clone(); lastAttack = attack
         val center = rest ?: return
         val recoil = recoilStrength * (recoilTicks / 40f) * if (recoilTicks % 10 == 0) 1f else -0.6f
         val idle = phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE
         val windup = phase == com.sneakyvenustrap.service.PlantAttack.Phase.WINDUP
-        val duration = if (swallowing) 50f else 30f
-        val progress = when {
-            idle -> 0f
-            windup -> (elapsed / duration) * 0.35f
-            else -> (1f - (elapsed - duration) / 50f).coerceIn(0f, 1f)
-        }
+        val duration = attack.windupTicks.toFloat()
+        val progress = attack.progress
         val delta = if (aim == null) Vector3f() else Vector3f(
             (aim.x - center.x).toFloat(), (aim.y - center.y).toFloat(), (aim.z - center.z).toFloat()).mul(progress)
         val yaw = if (aim == null || idle) 0f else kotlin.math.atan2(-(aim.x - center.x), -(aim.z - center.z)).toFloat()
+        model?.inhaling = attack.inhaling
         model?.pose(delta, yaw, if (windup) 26f + 12f * progress else 26f - 18f * progress,
             if (windup) -22f - 12f * progress else -22f + 14f * progress, recoil)
         for (part in head) {
@@ -106,8 +112,12 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
             part.display.interpolationDelay = 0
             part.display.transformation = Transformation(local.add(delta).sub(part.local), rotation, Vector3f(part.scale), Quaternionf())
         }
-        mouths.firstOrNull()?.teleport(center.clone().add(delta.x.toDouble(), delta.y.toDouble() - (if (textured) 1.2 else 2.8), delta.z.toDouble()))
+        val mouthCenter = model?.hinge?.let { origin.clone().add(1.5 + it.x, 0.01 + it.y - 1.2, 1.5 + it.z) }
+            ?: center.clone().add(delta.x.toDouble(), delta.y.toDouble() - 2.8, delta.z.toDouble())
+        mouths.firstOrNull()?.teleport(mouthCenter)
     }
+
+    val contactCenter get() = mouths.first().location.clone().add(0.0, if (textured) 1.2 else 2.8, 0.0)
 
     fun hitbox(at: Location, width: Float, height: Float): Interaction =
         at.world.spawn(at, Interaction::class.java).also {
@@ -126,5 +136,5 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
         }
     }
 
-    fun close() { entities.forEach { it.remove() }; entities.clear(); mouths.clear(); head.clear() }
+    fun close() { bar.removeAll(); entities.forEach { it.remove() }; entities.clear(); mouths.clear(); head.clear() }
 }

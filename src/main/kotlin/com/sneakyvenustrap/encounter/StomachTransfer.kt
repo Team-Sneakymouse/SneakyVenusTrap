@@ -30,6 +30,8 @@ internal class StomachTransfer(private val plugin: JavaPlugin) : Listener {
         return false
     }
 
+    internal fun diagnostic(message: String, key: String) = report(message, key)
+
     private fun token(value: String) = value.take(64).replace(Regex("[^a-zA-Z0-9_.-]"), "_")
     private fun report(message: String, key: String) {
         val now = System.nanoTime()
@@ -43,7 +45,7 @@ internal class StomachTransfer(private val plugin: JavaPlugin) : Listener {
         if (recent.size > 128) recent.remove(recent.keys.first())
     }
 
-    fun move(player: Player, destination: Location, garden: String = "recovery", mode: String = "return"): Boolean {
+    fun move(player: Player, destination: Location, garden: String = "recovery", mode: String = "return", reason: String = "unspecified"): Boolean {
         val attempt = ++serial
         val origin = player.location.clone()
         val passengers = player.passengers.toList()
@@ -53,7 +55,7 @@ internal class StomachTransfer(private val plugin: JavaPlugin) : Listener {
         var result: Boolean? = null
         cancelled = null
         fun finish(outcome: String, error: Exception? = null): Boolean {
-            report("attempt=$attempt player=${player.uniqueId} garden=${token(garden)} mode=$mode phase=transfer from=${token(origin.world.name)}:${origin.blockX},${origin.blockY},${origin.blockZ} to=${token(destination.world.name)}:${destination.blockX},${destination.blockY},${destination.blockZ} vehicle=$vehicle passengers=${passengers.size} types=[$types] removed=$removed teleportReturn=$result cancelledAtMonitor=$cancelled outcome=$outcome exception=${error?.javaClass?.simpleName ?: "none"}", "${player.uniqueId}:$mode:$outcome")
+            report("attempt=$attempt player=${player.uniqueId} garden=${token(garden)} mode=$mode reason=${token(reason)} phase=transfer from=${token(origin.world.name)}:${origin.blockX},${origin.blockY},${origin.blockZ} to=${token(destination.world.name)}:${destination.blockX},${destination.blockY},${destination.blockZ} vehicle=$vehicle passengers=${passengers.size} types=[$types] removed=$removed actual=${token(player.world.name)}:${player.location.blockX},${player.location.blockY},${player.location.blockZ} teleportReturn=$result cancelledAtMonitor=$cancelled outcome=$outcome exception=${error?.javaClass?.simpleName ?: "none"}", "${player.uniqueId}:$mode:$reason:$outcome")
             return outcome == "success"
         }
         try {

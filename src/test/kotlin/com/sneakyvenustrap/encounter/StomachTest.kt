@@ -95,7 +95,7 @@ class StomachTest {
         player.teleport(Location(outside, 0.5, 64.0, 0.5))
         var sounds = 0
         val observed = java.lang.reflect.Proxy.newProxyInstance(javaClass.classLoader, arrayOf(org.bukkit.entity.Player::class.java)) { _, method, args ->
-            if (method.name == "playSound") sounds++
+            if (method.name == "playSound" && args?.getOrNull(1) == "entity.ghast.scream") sounds++
             try { method.invoke(player, *(args ?: emptyArray())) }
             catch (error: java.lang.reflect.InvocationTargetException) { throw error.targetException }
         } as org.bukkit.entity.Player
@@ -107,6 +107,32 @@ class StomachTest {
         assertTrue(stomach.release(observed))
         server.scheduler.performTicks(80)
         assertEquals(2, sounds, "released captive cannot receive stale echo callbacks")
+    }
+
+    @Test fun oldRoundEchoesCannotPlayAfterAKnotStartsAnotherRound() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        var sounds = 0
+        val observed = java.lang.reflect.Proxy.newProxyInstance(javaClass.classLoader, arrayOf(org.bukkit.entity.Player::class.java)) { _, method, args ->
+            if (method.name == "playSound" && args?.getOrNull(1) == "entity.ghast.scream") sounds++
+            try { method.invoke(player, *(args ?: emptyArray())) }
+            catch (error: java.lang.reflect.InvocationTargetException) { throw error.targetException }
+        } as org.bukkit.entity.Player
+        val stomach = Stomachs(plugin) { arena }
+        assertTrue(stomach.swallow(observed, "garden"))
+        server.scheduler.performTicks(5)
+        assertTrue(stomach.strike(observed, stomach.originalFlower(player.uniqueId)!!))
+        assertEquals(2, sounds, "new round original follows the first original")
+        server.scheduler.performTicks(11)
+        assertEquals(2, sounds, "old round first echo is fenced while the same captive remains")
+        server.scheduler.performTicks(48)
+        assertEquals(5, sounds, "only the three new round echoes may play")
+        assertTrue(stomach.contains(player.uniqueId))
+        stomach.release(player)
     }
 
     @Test fun arenaConstructionFailureCancelsWithoutMovingOrJournallingPlayer() {
@@ -258,6 +284,109 @@ class StomachTest {
         server.pluginManager.callEvent(respawn)
         assertEquals(outside, respawn.respawnLocation.world)
         server.scheduler.performOneTick()
+        assertFalse(stomach.contains(player.uniqueId))
+    }
+
+    @Test fun puzzleUsesOneHintAndProgressBarInsteadOfStrikeChat() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        val stomach = Stomachs(plugin) { arena }
+        assertTrue(stomach.swallow(player, "garden"))
+        assertEquals(1, generateSequence { player.nextMessage() }.toList().size)
+        val bar = stomach.progressBar(player.uniqueId)!!
+        assertEquals(listOf(player), bar.players)
+        stomach.tick()
+        assertTrue(bar.progress > 0)
+        stomach.strike(player, stomach.originalFlower(player.uniqueId)!!)
+        assertTrue(bar.title.contains("knots 1/3"))
+        repeat(2) { stomach.strike(player, stomach.originalFlower(player.uniqueId)!!) }
+        assertTrue(bar.players.isEmpty(), "release removes the owned progress UI")
+        assertTrue(generateSequence { player.nextMessage() }.toList().isEmpty(), "knots and escape use sound, particles and progress UI")
+        assertEquals(outside, player.world)
+    }
+
+    @Test fun cancelledAndCrossRoomAttemptsDoNotReleaseAndDiagnosticsExplainTheActualReturn() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        val stomach = Stomachs(plugin) { arena }
+        server.pluginManager.registerEvents(StomachEvents(plugin, stomach), plugin)
+        val logs = mutableListOf<String>()
+        val handler = object : java.util.logging.Handler() {
+            override fun publish(record: java.util.logging.LogRecord) { logs += record.message }
+            override fun flush() {}
+            override fun close() {}
+        }
+        plugin.logger.addHandler(handler)
+        try {
+            assertTrue(stomach.swallow(player, "garden"))
+            val cancelled = org.bukkit.event.player.PlayerTeleportEvent(player, player.location, outside.spawnLocation,
+                org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN)
+            cancelled.isCancelled = true
+            server.pluginManager.callEvent(cancelled)
+            assertTrue(cancelled.isCancelled)
+            assertTrue(stomach.contains(player.uniqueId))
+            val crossRoom = org.bukkit.event.player.PlayerTeleportEvent(player, player.location, player.location.clone().add(32.0, 0.0, 0.0))
+            server.pluginManager.callEvent(crossRoom)
+            assertTrue(crossRoom.isCancelled)
+            assertTrue(stomach.contains(player.uniqueId))
+            assertTrue(logs.any { it.contains("phase=teleport-observe") && it.contains("owned=false") && it.contains("cancelledAtMonitor=true") && it.contains("cause=PLUGIN") && it.contains("from=") && it.contains("to=") })
+            assertTrue(stomach.release(player, Stomachs.ReleaseReason.ESCAPE))
+            assertTrue(logs.any { it.contains("phase=release-request reason=ESCAPE") && it.contains("heldMillis=") })
+            assertTrue(logs.any { it.contains("mode=return reason=ESCAPE") && it.contains("outcome=success") })
+        } finally { plugin.logger.removeHandler(handler); stomach.close() }
+    }
+
+    @Test fun sameRoomCorrectionsKeepTheWholePlayerInsideTheWallsFloorAndCeiling() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        val stomach = Stomachs(plugin) { arena }
+        server.pluginManager.registerEvents(StomachEvents(plugin, stomach), plugin)
+        assertTrue(stomach.swallow(player, "garden"))
+        val center = player.location
+        val half = player.width / 2
+        assertTrue(stomach.isRoomDestination(player.uniqueId, Location(arena, 12.0 - half - 0.01, 65.0, 8.5)))
+        for (edge in listOf(11.9, 12.0, 5.1, 5.0)) {
+            for (at in listOf(Location(arena, edge, 65.0, 8.5), Location(arena, 8.5, 65.0, edge))) {
+                val event = org.bukkit.event.player.PlayerTeleportEvent(player, center, at)
+                server.pluginManager.callEvent(event)
+                assertTrue(event.isCancelled, "player body overlaps a wall at $at")
+            }
+        }
+        assertFalse(stomach.isRoomDestination(player.uniqueId, center.clone().add(0.0, -0.01, 0.0)))
+        assertFalse(stomach.isRoomDestination(player.uniqueId, Location(arena, 8.5, 69.0 - player.height + 0.01, 8.5)))
+        assertTrue(stomach.contains(player.uniqueId))
+        stomach.close()
+    }
+
+    @Test fun sameRoomFollowupTeleportDoesNotInstantlyReturnANewCaptive() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        val stomach = Stomachs(plugin) { arena }
+        server.pluginManager.registerEvents(StomachEvents(plugin, stomach), plugin)
+        assertTrue(stomach.swallow(player, "garden"))
+        // A follow-up plugin teleport/position correction is not a puzzle escape.
+        assertTrue(player.teleport(player.location.clone().add(0.1, 0.0, 0.0)))
+        assertTrue(stomach.contains(player.uniqueId))
+        assertEquals(arena, player.world)
+        assertNotNull(stomach.returnForRespawn(player.uniqueId))
+        repeat(3) { stomach.strike(player, stomach.originalFlower(player.uniqueId)!!) }
+        assertEquals(outside, player.world)
         assertFalse(stomach.contains(player.uniqueId))
     }
 

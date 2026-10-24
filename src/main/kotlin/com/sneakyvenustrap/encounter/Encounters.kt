@@ -17,6 +17,7 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
         var target: UUID? = null
         var cycles = 0
         var swallowing = false
+        val inhale = InhalePull()
         val attack = com.sneakyvenustrap.service.PlantAttack()
         var aim: Location? = null
         var vine: TunnellingVine? = null
@@ -48,6 +49,7 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
     }
     private fun remove(found: Encounter) {
         stomachs.releaseGarden(found.id)
+        found.inhale.close()
         found.vine?.close()
         found.view.close()
         gardens.remove(found)
@@ -89,7 +91,8 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
                     garden.aim = target.location.clone().add(0.0, 1.0, 0.0)
                     garden.swallowing = garden.cycles++ % 2 == 1
                     attack.start(garden.swallowing)
-                    target.sendMessage(if (garden.swallowing) "Her throat opens — SWALLOW incoming! Escape the main jaws!" else "The main head draws back to BITE — dodge!")
+                    garden.view.origin.world.spawnParticle(if (garden.swallowing) Particle.SOUL else Particle.COMPOSTER,
+                        garden.view.mouths.first().location, 16, 0.7, 0.5, 0.7, 0.02)
                     sound(target.location, "warning", "entity.warden.tendril_clicks", 0.7f)
                 }
             }
@@ -99,14 +102,12 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
                 if (distant != null) {
                     garden.vineCooldown = now + 100
                     val route = VineTerrain.route(garden.view.origin.clone().add(1.5, 0.0, 1.5), distant.location)
-                    if (route == null) distant.sendMessage("The tunnelling roots recoil from impassable ground.")
-                    else {
+                    if (route != null) {
                         garden.vine = TunnellingVine(garden.view, distant.uniqueId, route) { player ->
                             val safe = stomachs.prepareAnchor(player) ?: return@TunnellingVine false
                             garden.anchor = player.uniqueId to safe
                             true
                         }
-                        distant.sendMessage("Roots tunnel from the Mother toward you — move away!")
                         garden.vine!!.tick(distant)
                     }
                 }
@@ -115,24 +116,23 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
             val valid = victim != null && victim.isOnline && victim.world == garden.view.origin.world && eligible(victim, garden)
             if (attack.phase != com.sneakyvenustrap.service.PlantAttack.Phase.IDLE) {
                 val contact = attack.tick(valid)
-                garden.view.pose(garden.aim, attack.phase, attack.elapsed, garden.swallowing)
+                if (attack.inhaling && valid) {
+                    if (garden.anchor?.first != victim.uniqueId) stomachs.prepareAnchor(victim)?.let { garden.anchor = victim.uniqueId to it }
+                    if (garden.anchor?.first == victim.uniqueId) garden.inhale.apply(victim, garden.view.origin.clone().add(1.5, 0.0, 1.5))
+                } else garden.inhale.close()
+                garden.view.pose(garden.aim, attack)
                 // The committed snap exposes her throat even when the victim dodges it.
                 if (contact) garden.view.health.expose(45)
-                if (contact && victim != null && garden.aim != null && victim.location.clone().add(0.0, 1.0, 0.0).distanceSquared(garden.aim!!) <= 4) {
+                if (contact && victim != null && garden.aim != null && victim.location.clone().add(0.0, 1.0, 0.0).distanceSquared(garden.view.contactCenter) <= 4) {
                     if (garden.swallowing) {
-                        if (stomachs.swallow(victim, garden.id, garden.anchor?.takeIf { it.first == victim.uniqueId }?.second)) victim.sendMessage("The main jaws close. You have been swallowed!")
-                        else {
-                            victim.sendMessage("Her throat convulses; the swallow fails!")
+                        if (!stomachs.swallow(victim, garden.id, garden.anchor?.takeIf { it.first == victim.uniqueId }?.second)) {
                             plugin.logger.warning("Main-head swallow failed: garden=${garden.id}, player=${victim.uniqueId}; see stomach diagnostic.")
                         }
                     } else victim.damage(if (victim.isSprinting) 6.0 else 3.0)
                     sound(garden.aim!!, "bite", "entity.ravager.roar", 0.6f)
                 }
             }
-            if (now % 20 == 0L) players.forEach {
-                it.sendActionBar(net.kyori.adventure.text.Component.text("The Mother • ${garden.view.health.health.toInt()}/${garden.view.health.maximumHealth.toInt()}" +
-                    if (garden.view.health.exposedTicks > 0) " • THROAT EXPOSED!" else " • Armoured roots"))
-            }
+            garden.view.updateBar(players, garden.swallowing && attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.WINDUP)
         }
     }
     private fun sound(at: Location, key: String, fallback: String, pitch: Float) {
