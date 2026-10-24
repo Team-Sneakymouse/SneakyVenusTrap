@@ -48,10 +48,22 @@ internal class TexturedPlant(private val origin: Location, private val register:
     private val upper = PlantModels.spawn(center, "upperjaw") { parts += it; register(it) }
     private val lower = PlantModels.spawn(center, "lowerjaw") { parts += it; register(it) }
     private val leaves = List(6) { PlantModels.spawn(center, "leaf") { parts += it; register(it) } }
+    private val neck = List(6) { PlantModels.spawn(center, "vine_segment") { parts += it; register(it) } }
     val rest get() = center.clone().add(0.0, 3.01, 0.0)
+    var hinge = com.sneakyvenustrap.service.NeckGeometry.pose(Vector3f(), 0f, 0f).hinge
+        private set
+
+    var inhaling = false
 
     init { pose(Vector3f(), 0f, 26f, -22f, 0f) }
     fun pose(delta: Vector3f, yaw: Float, upperAngle: Float, lowerAngle: Float, recoil: Float) {
+        val pose = com.sneakyvenustrap.service.NeckGeometry.pose(delta, yaw, recoil)
+        hinge = pose.hinge
+        neck.zip(pose.segments).forEach { (part, segment) ->
+            part.interpolationDelay = 0
+            part.transformation = Transformation(segment.start, segment.rotation,
+                Vector3f(2f, segment.lengthScale, 2f), Quaternionf())
+        }
         val lift = Vector3f(0f, 1.76f, 0f)
         val sway = Quaternionf().rotateZ(recoil * 0.12f)
         body.transformation = PlantModels.transform(lift, Vector3f(0f, -1.76f, 0f), sway)
@@ -63,7 +75,7 @@ internal class TexturedPlant(private val origin: Location, private val register:
         }
         leaves.forEachIndexed { i, part ->
             val side = if (i < 3) -1 else 1
-            val angle = side * listOf(48, 80, 118)[i % 3] + recoil * 20
+            val angle = side * listOf(48, 80, 118)[i % 3] * (if (inhaling) 0.55f else 1f) + recoil * 20
             part.transformation = PlantModels.transform(Vector3f(side * 0.25f, 1.135f, 0.125f), Vector3f(),
                 Quaternionf().rotateZ(Math.toRadians(angle.toDouble()).toFloat()))
         }

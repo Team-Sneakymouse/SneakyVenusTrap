@@ -28,6 +28,20 @@ class PlantAttackTest {
         }
     }
 
+    @Test fun inhaleHasCuePullThenFifteenPullFreeTicksBeforeOneContactEvenInRage() {
+        val attack = PlantAttack()
+        attack.start(true, true)
+        assertEquals(50, attack.windupTicks)
+        repeat(3) { attack.tick(true); assertFalse(attack.inhaling) }
+        repeat(3) { assertFalse(attack.tick(true)); assertTrue(attack.inhaling) }
+        repeat(3) { assertFalse(attack.tick(true)); assertFalse(attack.inhaling) }
+        assertTrue(attack.tick(true))
+        assertFalse(attack.inhaling)
+        repeat(6) { assertFalse(attack.tick(true)); assertEquals(PlantAttack.Phase.RECOVERY, attack.phase) }
+        assertFalse(attack.tick(true))
+        assertEquals(PlantAttack.Phase.IDLE, attack.phase)
+    }
+
     @Test fun invalidTargetCancelsWithoutContact() {
         val attack = PlantAttack()
         attack.start(true)

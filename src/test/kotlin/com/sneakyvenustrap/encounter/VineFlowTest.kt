@@ -24,7 +24,7 @@ class VineFlowTest {
         server.scheduler.performTicks(5)
         assertEquals(1, trail().size)
         assertTrue(trail().first().location.x < 4, "trail must begin at roots, not target")
-        server.scheduler.performTicks(25)
+        server.scheduler.performTicks(15)
         assertTrue(trail().size > 1)
         assertTrue(trail().maxOf { it.location.x } < player.location.x)
         server.scheduler.performTicks(100)
@@ -34,7 +34,7 @@ class VineFlowTest {
         player.gameMode = org.bukkit.GameMode.CREATIVE
         server.scheduler.performTicks(5)
         assertTrue(trail().isEmpty())
-        assertEquals(9, world.entities.filterIsInstance<ItemDisplay>().size)
+        assertEquals(15, world.entities.filterIsInstance<ItemDisplay>().size)
         plugin.encounters.close()
         assertTrue(world.entities.filter { it !is org.bukkit.entity.Player }.isEmpty())
     }
