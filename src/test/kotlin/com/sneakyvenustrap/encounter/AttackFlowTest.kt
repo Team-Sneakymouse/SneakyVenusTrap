@@ -59,7 +59,7 @@ class AttackFlowTest {
     @Test fun distinctTelegraphPrecedesExactlyOneEncounterDrivenTransfer() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val world = server.addSimpleWorld("Darkvale")
-        val arena = server.addSimpleWorld("injected-stomach")
+        val arena = server.addStomachWorld("injected-stomach")
         world.getChunkAt(0, 0).load()
         for (x in -4..5) for (z in -5..4) world.getBlockAt(x, 63, z).type = org.bukkit.Material.STONE
         val player = server.addPlayer()
