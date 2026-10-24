@@ -116,8 +116,9 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
             if (attack.phase != com.sneakyvenustrap.service.PlantAttack.Phase.IDLE) {
                 val contact = attack.tick(valid)
                 garden.view.pose(garden.aim, attack.phase, attack.elapsed, garden.swallowing)
+                // The committed snap exposes her throat even when the victim dodges it.
+                if (contact) garden.view.health.expose(45)
                 if (contact && victim != null && garden.aim != null && victim.location.clone().add(0.0, 1.0, 0.0).distanceSquared(garden.aim!!) <= 4) {
-                    garden.view.health.expose(45)
                     if (garden.swallowing) {
                         if (stomachs.swallow(victim, garden.id, garden.anchor?.takeIf { it.first == victim.uniqueId }?.second)) victim.sendMessage("The main jaws close. You have been swallowed!")
                         else {
