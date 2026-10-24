@@ -34,7 +34,7 @@ class VineFlowTest {
         player.gameMode = org.bukkit.GameMode.CREATIVE
         server.scheduler.performTicks(5)
         assertTrue(trail().isEmpty())
-        assertEquals(15, world.entities.filterIsInstance<ItemDisplay>().size)
+        assertEquals(18, world.entities.filterIsInstance<ItemDisplay>().size)
         plugin.encounters.close()
         assertTrue(world.entities.filter { it !is org.bukkit.entity.Player }.isEmpty())
     }

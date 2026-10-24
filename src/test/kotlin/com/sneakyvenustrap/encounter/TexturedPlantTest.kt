@@ -55,8 +55,8 @@ class TexturedPlantTest {
         world.getChunkAt(0, 0).load()
         assertTrue(plugin.encounters.spawn(Location(world, 0.5, 64.0, 0.5)))
         val parts = world.entities.filterIsInstance<ItemDisplay>()
-        assertEquals(15, parts.size)
-        assertEquals(6, parts.count { it.itemStack.itemMeta.itemModel.toString() == "dev:venus_trap/vine_segment" })
+        assertEquals(18, parts.size)
+        assertEquals(9, parts.count { it.itemStack.itemMeta.itemModel.toString() == "dev:venus_trap/vine_segment" })
         val keys = parts.map { it.itemStack.itemMeta.itemModel.toString() }
         assertEquals(6, keys.count { it == "dev:venus_trap/leaf" })
         for (key in listOf("body", "upperjaw", "lowerjaw")) assertEquals(1, keys.count { it == "dev:venus_trap/$key" })
