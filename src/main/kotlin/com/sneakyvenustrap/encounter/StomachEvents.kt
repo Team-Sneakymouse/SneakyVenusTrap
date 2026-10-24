@@ -55,8 +55,8 @@ class StomachEvents(private val plugin: JavaPlugin, private val stomachs: Stomac
     fun drop(event: org.bukkit.event.player.PlayerDropItemEvent) { if (stomachs.isArena(event.player.world)) event.isCancelled = true }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun explode(event: org.bukkit.event.entity.EntityExplodeEvent) { if (stomachs.isArena(event.location.world)) event.isCancelled = true }
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun chunk(event: org.bukkit.event.world.ChunkUnloadEvent) { stomachs.releaseChunk(event.chunk) }
+    @EventHandler(priority = EventPriority.MONITOR)
+    fun chunk(event: org.bukkit.event.world.ChunkUnloadEvent) { stomachs.observeChunkUnload(event.chunk) }
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun world(event: org.bukkit.event.world.WorldUnloadEvent) { stomachs.releaseWorld(event.world) }
     @EventHandler fun changedWorld(event: org.bukkit.event.player.PlayerChangedWorldEvent) {

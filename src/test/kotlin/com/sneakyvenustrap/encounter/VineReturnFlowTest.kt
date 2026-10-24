@@ -10,13 +10,14 @@ import org.junit.jupiter.api.Test
 import org.mockbukkit.mockbukkit.MockBukkit
 
 class VineReturnFlowTest {
+    private lateinit var server: org.mockbukkit.mockbukkit.ServerMock
+    @org.junit.jupiter.api.BeforeEach fun setup() { server = MockBukkit.mock() }
     @AfterEach fun cleanup() { MockBukkit.unmock() }
 
     @Test fun pulledVictimEscapesToPreDragAnchorAndNearbyPlayerRetainsOwnReturnLocation() {
-        val server = MockBukkit.mock()
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val world = TerrainWorld().also { it.name = "Darkvale"; server.addWorld(it) }
-        val arena = server.addSimpleWorld("vine-return-stomach")
+        val arena = server.addStomachWorld("vine-return-stomach")
         for (x in -3..18) for (z in -3..6) world.getBlockAt(x, 63, z).type = Material.STONE
         world.getChunkAt(0, 0).load(); world.getChunkAt(1, 0).load()
         val stomach = Stomachs(plugin) { arena }
