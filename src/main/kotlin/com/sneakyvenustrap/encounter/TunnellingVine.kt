@@ -40,6 +40,20 @@ internal object VineTerrain {
         }
         return null
     }
+    /** A step starts when the body's leading edge reaches it, not only its centre.
+     * Consider supported heights under the footprint, then check the entire raised body.
+     * The caller still limits every rise/drop to 0.6; full walls and low ceilings stay blocked.
+     */
+    fun routeSurface(at: Location): Location? {
+        surface(at)?.let { return it }
+        for (dx in listOf(-0.32, 0.0, 0.32)) for (dz in listOf(-0.32, 0.0, 0.32)) {
+            val edge = surface(at.clone().add(dx, 0.0, dz)) ?: continue
+            val raised = at.clone().apply { y = edge.y }
+            if (clear(raised)) return raised
+        }
+        return null
+    }
+
     fun route(root: Location, target: Location): List<Location>? {
         if (root.world != target.world || root.distanceSquared(target) > 26 * 26) return null
         val steps = ceil(root.distance(target) / 1.5).toInt().coerceIn(1, 18)
@@ -48,15 +62,18 @@ internal object VineTerrain {
         for (i in 0..steps) {
             val next = root.clone().add(target.toVector().subtract(root.toVector()).multiply(i.toDouble() / steps))
             next.y = previous.y
-            val sample = surface(next) ?: return null
+            val sample = routeSurface(next) ?: return null
             if (kotlin.math.abs(sample.y - previous.y) > 0.6) return null
             // Sweep every quarter block; coarse route points alone can tunnel through thin walls.
             val span = previous.distance(sample)
             val sweep = ceil(span / 0.25).toInt().coerceAtLeast(1)
+            var swept = previous
             for (j in 1..sweep) {
                 val probe = previous.clone().add(sample.toVector().subtract(previous.toVector()).multiply(j.toDouble() / sweep))
-                val ground = surface(probe) ?: return null
-                if (kotlin.math.abs(ground.y - probe.y) > 0.6 || !clear(probe)) return null
+                probe.y = swept.y
+                val ground = routeSurface(probe) ?: return null
+                if (kotlin.math.abs(ground.y - swept.y) > 0.6) return null
+                swept = ground
             }
             result += sample
             previous = sample
@@ -134,7 +151,7 @@ internal class TunnellingVine(private val view: GardenView, val target: java.uti
                 if (index >= route.size) return@repeat
                 val at = route[index]
                 if (index > 0 && VineTerrain.route(route[index - 1], at) == null) return false
-                if (VineTerrain.surface(at)?.let { kotlin.math.abs(it.y - at.y) < 0.1 } != true) return false
+                if (VineTerrain.routeSurface(at)?.let { kotlin.math.abs(it.y - at.y) < 0.1 } != true) return false
                 val trail = part(at.clone().add(0.0, 0.01, 0.0), "trail_segment")
                 val direction = route.last().toVector().subtract(route.first().toVector())
                 val yaw = kotlin.math.atan2(direction.x, direction.z).toFloat()

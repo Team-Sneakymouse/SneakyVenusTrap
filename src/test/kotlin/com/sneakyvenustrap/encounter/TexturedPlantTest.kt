@@ -9,9 +9,10 @@ import org.junit.jupiter.api.AfterEach
 import org.mockbukkit.mockbukkit.MockBukkit
 
 class TexturedPlantTest {
+    private lateinit var server: org.mockbukkit.mockbukkit.ServerMock
+    @org.junit.jupiter.api.BeforeEach fun setup() { server = MockBukkit.mock() }
     @AfterEach fun cleanup() { MockBukkit.unmock() }
     @Test fun renderedNeckEndsAtTheActualJawHingeAndSharesItsContactCenterEvenDuringRecoil() {
-        val server = MockBukkit.mock()
         val world = server.addSimpleWorld("Darkvale")
         val origin = Location(world, 0.5, 64.0, 0.5)
         val view = GardenView(origin, true)
@@ -49,7 +50,6 @@ class TexturedPlantTest {
     }
 
     @Test fun defaultPlantUsesFifteenStableModelPartsAndOneMainMouth() {
-        val server = MockBukkit.mock()
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val world = server.addSimpleWorld("Darkvale")
         world.getChunkAt(0, 0).load()

@@ -8,9 +8,36 @@ import org.junit.jupiter.api.AfterEach
 import org.mockbukkit.mockbukkit.MockBukkit
 
 class VinePursuitTest {
+    private lateinit var server: org.mockbukkit.mockbukkit.ServerMock
+    @org.junit.jupiter.api.BeforeEach fun setup() { server = MockBukkit.mock() }
     @AfterEach fun cleanup() { MockBukkit.unmock() }
+    @Test fun halfSlabAscentRemainsRoutableWithoutBypassingWallsOrLowCeilings() {
+        val world = TerrainWorld().also { server.addWorld(it) }
+        world.getChunkAt(0, 0).load()
+        val root = Location(world, 2.0, 64.0, 2.0)
+        val target = Location(world, 10.6, 64.5, 2.0)
+        world.getBlockAt(10, 64, 2).type = org.bukkit.Material.STONE_SLAB
+        val ascent = VineTerrain.route(root, target)
+        assertNotNull(ascent, "a real half-block ascent must not collide with its own step")
+        assertEquals(64.5, ascent!!.last().y)
+        // A coarse point can itself straddle the step: execution must accept the same
+        // footprint-supported height that planning validated, not cancel at that point.
+        val player = server.addPlayer()
+        player.teleport(Location(world, 11.0, 64.0, 2.0))
+        val view = GardenView(Location(world, 0.5, 64.0, 0.5), true)
+        val straddling = VineTerrain.route(root, player.location)!!
+        val vine = TunnellingVine(view, player.uniqueId, straddling) { true }
+        repeat(20) { if (vine.phase == TunnellingVine.Phase.TRACKING) assertTrue(vine.tick(player)) }
+        assertEquals(TunnellingVine.Phase.LOCKED_WARNING, vine.phase)
+        vine.close(); view.close()
+        for (z in 1..2) world.getBlockAt(10, 66, z).type = org.bukkit.Material.STONE
+        assertNull(VineTerrain.route(root, target), "raising feet must still check head clearance")
+        for (z in 1..2) world.getBlockAt(10, 66, z).type = org.bukkit.Material.AIR
+        for (z in 1..2) world.getBlockAt(7, 64, z).type = org.bukkit.Material.STONE
+        assertNull(VineTerrain.route(root, target), "full-block walls cannot become legal steps")
+    }
+
     @Test fun acceleratesTracksEarlyThenKeepsFullStationaryWarningWithBoundedPieces() {
-        val server = MockBukkit.mock()
         val world = TerrainWorld().also { server.addWorld(it) }
         world.getChunkAt(0, 0).load(); world.getChunkAt(1, 0).load()
         val player = server.addPlayer()

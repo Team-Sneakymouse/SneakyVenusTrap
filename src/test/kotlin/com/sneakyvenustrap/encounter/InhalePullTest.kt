@@ -9,9 +9,10 @@ import org.junit.jupiter.api.AfterEach
 import org.mockbukkit.mockbukkit.MockBukkit
 
 class InhalePullTest {
+    private lateinit var server: org.mockbukkit.mockbukkit.ServerMock
+    @org.junit.jupiter.api.BeforeEach fun setup() { server = MockBukkit.mock() }
     @AfterEach fun cleanup() { MockBukkit.unmock() }
     @Test fun modestPullSweepsGroundAndReleasesAttenuatedMotionWithoutRemovingVerticalMotion() {
-        val server = MockBukkit.mock()
         val world = TerrainWorld().also { server.addWorld(it) }
         world.getChunkAt(0, 0).load()
         val player = server.addPlayer()

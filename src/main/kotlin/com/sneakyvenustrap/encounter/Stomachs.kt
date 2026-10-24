@@ -42,9 +42,13 @@ class Stomachs(private val plugin: JavaPlugin, private val worldFactory: () -> W
 
     internal fun isRoomDestination(id: UUID, at: Location): Boolean {
         val center = captives[id]?.center ?: return false
+        val player = plugin.server.getPlayer(id) ?: return false
+        val halfWidth = player.width / 2
+        // Room walls occupy the outer block columns; constrain the whole body, not its centre.
         return at.world.uid == center.world.uid &&
-            kotlin.math.abs(at.x - center.x) <= 3.5 && kotlin.math.abs(at.z - center.z) <= 3.5 &&
-            at.y >= center.y && at.y + 1.8 < center.y + 4
+            kotlin.math.abs(at.x - center.x) + halfWidth < 3.5 &&
+            kotlin.math.abs(at.z - center.z) + halfWidth < 3.5 &&
+            at.y >= center.y && at.y + player.height < center.y + 4
     }
 
     internal fun observeTeleport(event: org.bukkit.event.player.PlayerTeleportEvent) {
