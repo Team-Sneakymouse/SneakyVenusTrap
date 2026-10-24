@@ -17,8 +17,11 @@ import java.util.UUID
 /** Owns only a dedicated void world. Exterior worlds are NEVER written. Inventories are never replaced. */
 class Stomachs(private val plugin: JavaPlugin, private val worldFactory: () -> World = { arenaWorld(plugin) }) {
     private data class Captive(val garden: String, val slot: Int, val returnTo: Location, val puzzle: Digestion,
-                               val flowers: List<Interaction>, val entities: List<Entity>, val center: Location)
+                               val flowers: List<Interaction>, val entities: List<Entity>, val center: Location) {
+        var cueGeneration = 0
+    }
     private val captives = mutableMapOf<UUID, Captive>()
+    private val transfer = StomachTransfer(plugin)
     private val recoveryFile = File(plugin.dataFolder, "captives.yml")
     private val recovery = YamlConfiguration.loadConfiguration(recoveryFile)
     private var arena: World? = null
@@ -34,10 +37,17 @@ class Stomachs(private val plugin: JavaPlugin, private val worldFactory: () -> W
     fun prepareAnchor(player: Player): Location? = safe(player.location)
 
     fun swallow(player: Player, garden: String, anchor: Location? = null): Boolean {
-        if (contains(player.uniqueId) || isArena(player.world) || player.isDead || captives.size >= 16) return false
-        val destination = safe(anchor?.takeIf { it.world == player.world } ?: player.location) ?: return false
+        if (contains(player.uniqueId)) return transfer.decline(player, garden, "already-captive")
+        if (isArena(player.world)) return transfer.decline(player, garden, "already-in-arena")
+        if (player.isDead) return transfer.decline(player, garden, "dead")
+        if (captives.size >= 16) return transfer.decline(player, garden, "arena-full")
+        if (player.vehicle != null) return transfer.decline(player, garden, "mounted")
+        if (player.passengers.any { it !is org.bukkit.entity.TextDisplay || it.passengers.isNotEmpty() })
+            return transfer.decline(player, garden, "unsupported-passenger")
+        val destination = safe(anchor?.takeIf { it.world == player.world } ?: player.location)
+            ?: return transfer.decline(player, garden, "unsafe-anchor")
         val world = try { arena ?: worldFactory().also { arena = it } } catch (error: Exception) {
-            plugin.logger.severe("Stomach unavailable; swallow cancelled: ${error.message}"); return false
+            plugin.logger.severe("Stomach unavailable; swallow cancelled: ${error.javaClass.simpleName}"); return transfer.decline(player, garden, "arena-unavailable")
         }
         val slot = (0..15).first { candidate -> captives.values.none { it.slot == candidate } }
         val center = Location(world, slot * 32.0 + 8.5, 65.0, 8.5)
@@ -65,7 +75,7 @@ class Stomachs(private val plugin: JavaPlugin, private val worldFactory: () -> W
             val captive = Captive(garden, slot, destination, Digestion(random), flowers, flowers, center)
             captives[player.uniqueId] = captive
             transferring = true
-            val moved = try { player.teleport(center) } finally { transferring = false }
+            val moved = try { transfer.move(player, center, garden, "swallow") } finally { transferring = false }
             if (!moved) { release(player); return false }
             player.sendMessage("Make Her Scream: remember the ORIGINAL cry. Strike its flower; echoes burn. Break three throat knots!")
             cue(player, captive)
@@ -73,7 +83,7 @@ class Stomachs(private val plugin: JavaPlugin, private val worldFactory: () -> W
         } catch (error: Exception) {
             // Teleport may already have succeeded. Keep ownership until evacuation succeeds.
             if (contains(player.uniqueId)) release(player) else flowers.forEach { it.remove() }
-            plugin.logger.severe("Swallow failed; evacuation attempted, recovery retained if needed: ${error.message}")
+            plugin.logger.severe("Swallow failed player=${player.uniqueId}; evacuation attempted, recovery retained if needed: ${error.javaClass.simpleName}")
             return false
         }
     }
@@ -99,8 +109,18 @@ class Stomachs(private val plugin: JavaPlugin, private val worldFactory: () -> W
         val flower = captive.flowers[captive.puzzle.original]
         player.playSound(flower.location, plugin.config.getString("sounds.cry", "entity.ghast.scream")!!, 1f, 0.6f)
         player.spawnParticle(Particle.SOUL, flower.location.clone().add(0.0, 1.0, 0.0), 8, 0.1, 0.2, 0.1, 0.0)
-        captive.flowers.filter { it != flower }.forEach {
-            player.playSound(it.location, plugin.config.getString("sounds.echo", "entity.ghast.scream")!!, 0.4f, 1.5f)
+        val generation = ++captive.cueGeneration
+        captive.flowers.filter { it != flower }.forEachIndexed { index, echo ->
+            plugin.server.scheduler.runTaskLater(plugin, Runnable {
+                if (captives[player.uniqueId] !== captive || captive.cueGeneration != generation ||
+                    player.isDead || player.world != captive.center.world) return@Runnable
+                try {
+                    player.playSound(echo.location, plugin.config.getString("sounds.echo", "entity.ghast.scream")!!, 0.4f, 1.5f)
+                    player.spawnParticle(Particle.SMOKE, echo.location.clone().add(0.0, 1.0, 0.0), 5, 0.1, 0.2, 0.1, 0.0)
+                } catch (error: Exception) {
+                    plugin.logger.warning("stomach-cue player=${player.uniqueId} outcome=echo-failed exception=${error.javaClass.simpleName}")
+                }
+            }, (index + 1) * 16L)
         }
     }
 
@@ -121,7 +141,7 @@ class Stomachs(private val plugin: JavaPlugin, private val worldFactory: () -> W
             val destination = safe(saved) ?: plugin.server.worlds.filterNot { isArena(it) }.firstNotNullOfOrNull { safe(it.spawnLocation) }
             if (destination == null) { plugin.logger.severe("No safe release location for ${player.uniqueId}; recovery retained."); return false }
             transferring = true
-            val moved = try { player.teleport(destination) } finally { transferring = false }
+            val moved = try { transfer.move(player, destination, captive?.garden ?: "recovery", "return") } finally { transferring = false }
             if (!moved) return false
             player.fallDistance = 0f
             recovery.set(player.uniqueId.toString(), null)

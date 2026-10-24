@@ -21,6 +21,94 @@ class StomachTest {
             catch (error: java.lang.reflect.InvocationTargetException) { throw error.targetException }
         } as org.bukkit.entity.Player
 
+    @Test fun paperCrossWorldVehicleGateRemovesNameplateOnSwallowAndReturn() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        val display = outside.spawn(player.location, org.bukkit.entity.TextDisplay::class.java)
+        assertTrue(player.addPassenger(display))
+        // CraftPlayer.teleport0 rejects cross-world vehicles BEFORE firing any teleport event.
+        val paper = java.lang.reflect.Proxy.newProxyInstance(javaClass.classLoader, arrayOf(org.bukkit.entity.Player::class.java)) { _, method, args ->
+            if (method.name == "teleport" && args?.firstOrNull() is Location &&
+                (args[0] as Location).world != player.world && player.passengers.isNotEmpty()) false
+            else try { method.invoke(player, *(args ?: emptyArray())) }
+            catch (error: java.lang.reflect.InvocationTargetException) { throw error.targetException }
+        } as org.bukkit.entity.Player
+        val stomach = Stomachs(plugin) { arena }
+        assertTrue(stomach.swallow(paper, "garden"))
+        assertEquals(arena, player.world)
+        assertFalse(display.isValid)
+        val replacement = arena.spawn(player.location, org.bukkit.entity.TextDisplay::class.java)
+        player.addPassenger(replacement)
+        assertTrue(stomach.release(paper))
+        assertEquals(outside, player.world)
+        assertFalse(replacement.isValid)
+    }
+
+    @Test fun cancelledTransferKeepsPlayerOutsideAfterNameplateRemoval() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        val display = outside.spawn(player.location, org.bukkit.entity.TextDisplay::class.java)
+        player.addPassenger(display)
+        server.pluginManager.registerEvents(object : org.bukkit.event.Listener {
+            @org.bukkit.event.EventHandler fun teleport(event: org.bukkit.event.player.PlayerTeleportEvent) {
+                if (event.to.world == arena) event.isCancelled = true
+            }
+        }, plugin)
+        val stomach = Stomachs(plugin) { arena }
+        assertFalse(stomach.swallow(player, "garden"))
+        assertEquals(outside, player.world)
+        assertFalse(display.isValid)
+        assertNull(stomach.returnForRespawn(player.uniqueId))
+    }
+
+    @Test fun livingPassengerIsRefusedWithoutDismountingOrDeletingIt() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        val passenger = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        passenger.teleport(player.location)
+        player.addPassenger(passenger)
+        val stomach = Stomachs(plugin) { arena }
+        assertFalse(stomach.swallow(player, "garden"))
+        assertEquals(outside, player.world)
+        assertEquals(player, passenger.vehicle)
+        assertTrue(passenger.isValid)
+    }
+
+    @Test fun echoesAreSequencedAndStaleCuesStopAfterRelease() {
+        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+        val outside = server.addSimpleWorld("Darkvale")
+        val arena = server.addSimpleWorld("stomach-test")
+        outside.getBlockAt(0, 63, 0).type = Material.STONE
+        val player = server.addPlayer()
+        player.teleport(Location(outside, 0.5, 64.0, 0.5))
+        var sounds = 0
+        val observed = java.lang.reflect.Proxy.newProxyInstance(javaClass.classLoader, arrayOf(org.bukkit.entity.Player::class.java)) { _, method, args ->
+            if (method.name == "playSound") sounds++
+            try { method.invoke(player, *(args ?: emptyArray())) }
+            catch (error: java.lang.reflect.InvocationTargetException) { throw error.targetException }
+        } as org.bukkit.entity.Player
+        val stomach = Stomachs(plugin) { arena }
+        assertTrue(stomach.swallow(observed, "garden"))
+        assertEquals(1, sounds, "only the original sounds immediately")
+        server.scheduler.performTicks(16)
+        assertEquals(2, sounds, "first echo follows the original, not simultaneous")
+        assertTrue(stomach.release(observed))
+        server.scheduler.performTicks(80)
+        assertEquals(2, sounds, "released captive cannot receive stale echo callbacks")
+    }
+
     @Test fun arenaConstructionFailureCancelsWithoutMovingOrJournallingPlayer() {
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val outside = server.addSimpleWorld("Darkvale")
