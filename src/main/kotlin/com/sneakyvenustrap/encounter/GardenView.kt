@@ -96,15 +96,20 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
         val center = rest ?: return
         val recoil = recoilStrength * (recoilTicks / 40f) * if (recoilTicks % 10 == 0) 1f else -0.6f
         val idle = phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE
-        val windup = phase == com.sneakyvenustrap.service.PlantAttack.Phase.WINDUP
+        val windup = phase == com.sneakyvenustrap.service.PlantAttack.Phase.WINDUP && elapsed < attack.windupTicks - 5
         val duration = attack.windupTicks.toFloat()
         val progress = attack.progress
         val delta = if (aim == null) Vector3f() else Vector3f(
             (aim.x - center.x).toFloat(), (aim.y - center.y).toFloat(), (aim.z - center.z).toFloat()).mul(progress)
         val yaw = if (aim == null || idle) 0f else kotlin.math.atan2(-(aim.x - center.x), -(aim.z - center.z)).toFloat()
         model?.inhaling = attack.inhaling
-        model?.pose(delta, yaw, if (windup) 26f + 12f * progress else 26f - 18f * progress,
-            if (windup) -22f - 12f * progress else -22f + 14f * progress, recoil)
+        // Canonical cuboid SAT: +/-14 is the nearest whole-degree pose without opposing
+        // fang/body intersections; zero and the former +/-8 bite cross the actual teeth.
+        // Keep the shared compensated hinge and correct positive-upper/negative-lower signs.
+        val idleChomp = idle && dramaAge % 160 in 110..130
+        val closure = if (idle) (if (idleChomp) 1f else 0.75f) else attack.closure
+        model?.pose(delta, yaw, if (windup) 26f + 12f * progress else 26f + (com.sneakyvenustrap.service.JawGeometry.CLOSED_ANGLE - 26f) * closure,
+            if (windup) -22f - 12f * progress else -22f + (22f - com.sneakyvenustrap.service.JawGeometry.CLOSED_ANGLE) * closure, recoil)
         for (part in head) {
             val jaw = if (windup) (elapsed / duration) * 0.20f else if (idle) 0f else -0.65f * progress
             val rotation = Quaternionf().rotateY(yaw).rotateX(if (part.upper) jaw else -jaw).rotateZ(recoil * 0.15f)
@@ -141,7 +146,7 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
     private var raging = false
     private var dramaAge = 0
     private val bundles = mutableListOf<org.bukkit.entity.Display>()
-    private val lanes = mutableListOf<org.bukkit.entity.Display>()
+    private var rootVines: RootVines? = null
     private fun bundleAt(slot: Int) = origin.clone().add(
         listOf(-2.0, 5.0, 1.5)[slot], 1.0, listOf(2.0, 2.0, -4.5)[slot])
 
@@ -154,6 +159,7 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
 
     fun buildBundles() {
         try {
+            rootVines = RootVines(origin, ::dramaPart)
             repeat(3) {
                 val part = dramaPart(bundleAt(it).add(0.0, -0.8, 0.0))
                 bundles += part
@@ -167,44 +173,18 @@ class GardenView(val origin: Location, val textured: Boolean = false) {
         return state.absorb(slot, swallowing)
     }
 
-    /** Two open parallel strips, with the central escape corridor always clear. No blocks or colliders. */
+    /** Persistent rooted tentacles and approved bait/rage, without periodic thorn lanes or glitter. */
     fun drama(state: com.sneakyvenustrap.service.PlantDrama, players: List<org.bukkit.entity.Player>) {
         dramaAge += 5
         raging = state.raging
         model?.raging = raging
+        rootVines?.pose(dramaAge / 20f, lastAttack?.progress ?: 0f)
         if (!held && raging) lastAttack?.let { pose(lastAim, it) }
-        if (raging && dramaAge % 20 == 0) origin.world.spawnParticle(org.bukkit.Particle.DUST,
-            contactCenter, 8, 0.8, 0.8, 0.8, 0.0,
-            org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(160, 48, 205), 1.3f))
         bundles.forEachIndexed { i, part ->
             part.transformation = Transformation(Vector3f(), Quaternionf().rotateZ(0.7f),
                 Vector3f(if (state.bundleAvailable(i)) 1.2f else 0f), Quaternionf())
-            if (state.bundleAvailable(i) && dramaAge % 20 == 0) origin.world.spawnParticle(org.bukkit.Particle.COMPOSTER,
-                bundleAt(i), 3, 0.2, 0.3, 0.2, 0.0)
-        }
-        if (state.lanesVisible && lanes.isEmpty()) {
-            try {
-                for (x in listOf(-3.0, 6.0)) for (z in -1..4)
-                    lanes += dramaPart(origin.clone().add(x, 0.1, z.toDouble()))
-            } catch (failure: Exception) { close(); throw failure }
-        }
-        lanes.forEach { part ->
-            part.transformation = Transformation(Vector3f(), Quaternionf().rotateZ(1.57f),
-                if (state.lanesVisible) Vector3f(0.65f, 1.5f, 0.65f) else Vector3f(), Quaternionf())
-            if (state.lanesVisible) origin.world.spawnParticle(if (state.hazardActive) org.bukkit.Particle.CRIT else org.bukkit.Particle.COMPOSTER,
-                part.location, 2, 0.25, 0.2, 0.25, 0.0)
-        }
-        if (state.hazardActive) for (player in players) {
-            val p = player.location
-            val x = p.x - origin.x
-            val z = p.z - origin.z
-            if ((kotlin.math.abs(x + 3.0) <= 0.6 || kotlin.math.abs(x - 6.0) <= 0.6) &&
-                z in -1.5..4.5 && kotlin.math.abs(p.y - origin.y) <= 1.2 && state.hit(player.uniqueId.toString())) {
-                player.damage(2.0)
-                player.addPotionEffect(org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS, 15, 0))
-            }
         }
     }
 
-    fun close() { bar.removeAll(); entities.forEach { it.remove() }; entities.clear(); mouths.clear(); head.clear(); bundles.clear(); lanes.clear() }
+    fun close() { bar.removeAll(); entities.forEach { it.remove() }; entities.clear(); mouths.clear(); head.clear(); bundles.clear(); rootVines = null }
 }

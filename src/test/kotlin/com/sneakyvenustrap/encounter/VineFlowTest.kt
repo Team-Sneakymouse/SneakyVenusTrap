@@ -10,9 +10,10 @@ import org.junit.jupiter.api.Assertions.*
 import org.mockbukkit.mockbukkit.MockBukkit
 
 class VineFlowTest {
+    private lateinit var server: org.mockbukkit.mockbukkit.ServerMock
+    @org.junit.jupiter.api.BeforeEach fun setup() { server = MockBukkit.mock() }
     @AfterEach fun cleanup() { MockBukkit.unmock() }
     @Test fun distantTrailStartsAtRootsProgressesThenPullsWithoutAnotherMouth() {
-        val server = MockBukkit.mock()
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val world = TerrainWorld().also { it.name = "Darkvale"; server.addWorld(it) }
         for (x in -2..17) for (z in -2..4) world.getBlockAt(x, 63, z).type = Material.STONE
@@ -34,7 +35,7 @@ class VineFlowTest {
         player.gameMode = org.bukkit.GameMode.CREATIVE
         server.scheduler.performTicks(5)
         assertTrue(trail().isEmpty())
-        assertEquals(18, world.entities.filterIsInstance<ItemDisplay>().size)
+        assertEquals(39, world.entities.filterIsInstance<ItemDisplay>().size)
         plugin.encounters.close()
         assertTrue(world.entities.filter { it !is org.bukkit.entity.Player }.isEmpty())
     }

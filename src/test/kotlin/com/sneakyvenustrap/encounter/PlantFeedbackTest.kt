@@ -11,9 +11,10 @@ import org.junit.jupiter.api.Assertions.*
 import org.mockbukkit.mockbukkit.MockBukkit
 
 class PlantFeedbackTest {
+    private lateinit var server: org.mockbukkit.mockbukkit.ServerMock
+    @org.junit.jupiter.api.BeforeEach fun setup() { server = MockBukkit.mock() }
     @AfterEach fun cleanup() { MockBukkit.unmock() }
     @Test fun authorizedHealthDamageRecoilsAndEmitsSapThenResetsWithoutRespawn() {
-        val server = MockBukkit.mock()
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val world = server.addSimpleWorld("Darkvale")
         world.getChunkAt(0, 0).load()
@@ -23,7 +24,9 @@ class PlantFeedbackTest {
         server.scheduler.performTicks(30)
         player.gameMode = GameMode.CREATIVE
         server.scheduler.performTicks(5)
-        val parts = world.entities.filterIsInstance<ItemDisplay>()
+        val parts = world.entities.filterIsInstance<ItemDisplay>().filter {
+            it.itemStack.itemMeta.itemModel?.key?.substringAfterLast('/') in setOf("body", "upperjaw", "lowerjaw", "leaf")
+        }
         val before = parts.map { it.transformation }
         val mouth = world.entities.filterIsInstance<Interaction>().single()
         val particleCount = world.spawnedParticles.size
@@ -33,8 +36,10 @@ class PlantFeedbackTest {
         assertTrue(world.spawnedParticles.size > particleCount, "localized sap, not text only")
         server.scheduler.performTicks(120)
         val rested = parts.map { it.transformation }
-        server.scheduler.performTicks(30)
+        server.scheduler.performTicks(160)
         assertEquals(rested, parts.map { it.transformation })
-        assertEquals(parts.map { it.uniqueId }, world.entities.filterIsInstance<ItemDisplay>().map { it.uniqueId })
+        assertEquals(parts.map { it.uniqueId }, world.entities.filterIsInstance<ItemDisplay>().filter {
+            it.itemStack.itemMeta.itemModel?.key?.substringAfterLast('/') in setOf("body", "upperjaw", "lowerjaw", "leaf")
+        }.map { it.uniqueId })
     }
 }

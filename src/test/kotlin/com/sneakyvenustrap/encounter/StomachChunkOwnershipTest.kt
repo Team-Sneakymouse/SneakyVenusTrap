@@ -113,6 +113,28 @@ class StomachChunkOwnershipTest {
         assertTrue(arena.entities.isEmpty())
     }
 
+    @Test fun ticketRemovalFailureAfterSuccessfulReturnRetainsRoomUntilRetry() {
+        val player = player()
+        val stomach = Stomachs(plugin) { arena }
+        assertTrue(stomach.swallow(player, "garden"))
+        arena.failRemoveTicket = true
+        assertFalse(stomach.release(player))
+        assertEquals(outside, player.world, "the player already returned before teardown failed")
+        assertNull(stomach.returnForRespawn(player.uniqueId), "successful return already cleared the journal")
+        assertTrue(stomach.contains(player.uniqueId), "retain room ownership for cleanup retry")
+        assertEquals(setOf(0 to 0), arena.tickets.keys)
+        arena.failRemoveTicket = false
+        assertTrue(stomach.release(player))
+        assertFalse(stomach.contains(player.uniqueId))
+        assertTrue(arena.tickets.isEmpty())
+        assertTrue(arena.entities.isEmpty())
+        assertEquals(Material.AIR, arena.getBlockAt(8, 64, 8).type)
+        assertTrue(stomach.swallow(player, "garden"), "confirmed cleanup frees the room slot")
+        assertEquals(8.5, player.location.x)
+        stomach.close()
+        assertTrue(arena.tickets.isEmpty())
+    }
+
     @Test fun abandonedConstructionCleanupFailureCanBeRetriedByClose() {
         val player = player()
         val stomach = Stomachs(plugin) { arena }

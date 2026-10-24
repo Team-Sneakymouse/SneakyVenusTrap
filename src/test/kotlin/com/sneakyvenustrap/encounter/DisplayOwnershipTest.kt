@@ -12,10 +12,11 @@ import java.lang.reflect.Proxy
 import java.lang.reflect.InvocationTargetException
 
 class DisplayOwnershipTest {
+    private lateinit var server: org.mockbukkit.mockbukkit.ServerMock
+    @org.junit.jupiter.api.BeforeEach fun setup() { server = MockBukkit.mock() }
     @AfterEach fun cleanup() { MockBukkit.unmock() }
 
     private fun failsCleanly(mode: String) {
-        val server = MockBukkit.mock()
         val world = object : WorldMock() {
             var displays = 0
             override fun <T : Entity> spawn(at: Location, type: Class<T>): T {
@@ -43,34 +44,23 @@ class DisplayOwnershipTest {
     }
 
     private fun dramaFailure(removalDuringTick: Boolean) {
-        val server = MockBukkit.mock()
         val plugin = MockBukkit.load(com.sneakyvenustrap.SneakyVenusTrap::class.java)
         val world = object : WorldMock() {
             var count = 0
             override fun <T : Entity> spawn(at: Location, type: Class<T>): T {
-                if (type == ItemDisplay::class.java && ++count == if (removalDuringTick) 20 else 17)
+                if (type == ItemDisplay::class.java && ++count == if (removalDuringTick) 37 else 17)
                     throw IllegalStateException("injected drama display failure")
                 return super.spawn(at, type)
             }
         }.also { it.name = "drama-failure"; server.addWorld(it); it.getChunkAt(0, 0).load() }
         val at = Location(world, 0.5, 64.0, 0.5)
-        if (!removalDuringTick) {
-            assertThrows(IllegalStateException::class.java) { plugin.encounters.spawn(at) }
-        } else {
-            assertTrue(plugin.encounters.spawn(at))
-            val player = server.addPlayer()
-            player.teleport(at)
-            player.gameMode = org.bukkit.GameMode.CREATIVE
-            server.scheduler.performTicks(235)
-            player.gameMode = org.bukkit.GameMode.SURVIVAL
-            server.scheduler.performTicks(5)
-        }
+        assertThrows(IllegalStateException::class.java) { plugin.encounters.spawn(at) }
         assertEquals(0, plugin.encounters.size)
         assertTrue(world.entities.filter { it !is org.bukkit.entity.Player }.isEmpty())
     }
 
     @Test fun bundleSpawnFailureRemovesWholeGarden() = dramaFailure(false)
-    @Test fun lazyLaneSpawnFailureRemovesEncounterAndAllEarlierParts() = dramaFailure(true)
+    @Test fun latePersistentTentacleSpawnFailureRemovesAllEarlierParts() = dramaFailure(true)
 
     @Test fun lateSpawnFailureRemovesEarlierParts() = failsCleanly("spawn")
     @Test fun configurationFailureRemovesRawAndEarlierParts() = failsCleanly("config")

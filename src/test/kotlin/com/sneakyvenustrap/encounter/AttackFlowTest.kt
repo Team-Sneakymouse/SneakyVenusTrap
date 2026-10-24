@@ -25,9 +25,9 @@ class AttackFlowTest {
         player.teleport(Location(world, 2.0, 64.0, -2.0))
         assertTrue(plugin.encounters.spawn(Location(world, 0.5, 64.0, 0.5)))
         val ids = world.entities.filterIsInstance<Display>().map { it.uniqueId }.toSet()
-        server.scheduler.performTicks(15)
+        server.scheduler.performTicks(20)
         player.teleport(Location(world, -3.0, 64.0, -2.0))
-        server.scheduler.performTicks(25)
+        server.scheduler.performTicks(20)
         assertEquals(20.0, player.health)
         assertTrue(plugin.encounters.exposedAt(player.location), "a dodged snap must still open the counterattack window")
         val mouth = world.entities.filterIsInstance<org.bukkit.entity.Interaction>().single()
@@ -46,13 +46,17 @@ class AttackFlowTest {
         player.gameMode = GameMode.SURVIVAL
         player.teleport(Location(world, 2.0, 64.0, -2.0))
         assertTrue(plugin.encounters.spawn(Location(world, 0.5, 64.0, 0.5)))
-        val displays = world.entities.filterIsInstance<Display>()
-        val initial = displays.map { it.transformation }
-        server.scheduler.performTicks(15)
+        server.scheduler.performTicks(5)
+        val displays = world.entities.filterIsInstance<org.bukkit.entity.ItemDisplay>().filter {
+            it.itemStack.itemMeta.itemModel?.key?.substringAfterLast('/') in setOf("body", "upperjaw", "lowerjaw", "leaf")
+        }
+        server.scheduler.performTicks(10)
         player.gameMode = GameMode.CREATIVE
         server.scheduler.performTicks(120)
         assertEquals(20.0, player.health)
-        assertEquals(initial, displays.map { it.transformation })
+        val recovered = displays.map { it.transformation }
+        server.scheduler.performTicks(160)
+        assertEquals(recovered, displays.map { it.transformation })
         assertEquals(1, world.entities.filterIsInstance<org.bukkit.entity.Interaction>().size)
     }
 
@@ -78,11 +82,18 @@ class AttackFlowTest {
         assertEquals(world, player.world)
         val messages = generateSequence { player.nextMessage() }.toList()
         assertTrue(messages.isEmpty(), "combat uses visual/audio telegraphs, never routine chat")
-        assertTrue(world.spawnedParticles.isNotEmpty(), "swallow preparation has a visible cue")
+        assertTrue(world.spawnedParticles.isEmpty(), "jaw opening and audio replace glitter cues")
         server.scheduler.performTicks(40)
         assertEquals(arena, player.world)
         assertTrue(stomach.contains(player.uniqueId))
-        server.scheduler.performTicks(40)
+        val jaws = world.entities.filterIsInstance<org.bukkit.entity.ItemDisplay>().filter {
+            it.itemStack.itemMeta.itemModel.toString().endsWith("jaw")
+        }
+        val matrix = org.mockbukkit.mockbukkit.entity.DisplayMock::class.java.getDeclaredField("transformationMatrix").apply { isAccessible = true }
+        val closed = jaws.map { org.joml.Matrix4f(matrix.get(it) as org.joml.Matrix4f) }
+        server.scheduler.performTicks(10)
+        assertEquals(closed, jaws.map { org.joml.Matrix4f(matrix.get(it) as org.joml.Matrix4f) }, "swallow retains exterior closed jaws after target world change")
+        server.scheduler.performTicks(30)
         assertEquals(1, transfers)
         repeat(3) { stomach.strike(player, stomach.originalFlower(player.uniqueId)!!) }
         assertEquals(world, player.world)

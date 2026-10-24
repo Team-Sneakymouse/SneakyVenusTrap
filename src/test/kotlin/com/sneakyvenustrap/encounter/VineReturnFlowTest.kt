@@ -45,6 +45,9 @@ class VineReturnFlowTest {
         assertTrue(sawPull, "actual vine must catch and issue pull before head capture")
         assertTrue(swallowed, "pulled victim must be swallowed by the main-head scheduler")
         assertEquals(arena, victim.world)
+        assertTrue(victim.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED)!!.modifiers.none {
+            it.key.namespace == "sneakyvenustrap" && it.key.key.startsWith("vine_")
+        }, "owned vine restraint is released before handoff")
         assertFalse(stomach.contains(bystander.uniqueId))
         repeat(3) { assertTrue(stomach.strike(victim, stomach.originalFlower(victim.uniqueId)!!)) }
         assertEquals(victimAnchor, victim.location, "escape restores the captured pre-drag anchor")

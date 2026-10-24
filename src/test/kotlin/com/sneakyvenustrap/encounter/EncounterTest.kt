@@ -92,7 +92,7 @@ class EncounterTest {
         val manager = plugin.encounters
         assertTrue(manager.spawn(at))
         assertEquals(1, manager.size)
-        assertEquals(18, world.entities.filterIsInstance<org.bukkit.entity.ItemDisplay>().size, "single textured head, body, six leaves and six neck connectors")
+        assertEquals(39, world.entities.filterIsInstance<org.bukkit.entity.ItemDisplay>().size, "single head, body, leaves, neck, bait and 21 persistent tentacle segments")
         assertTrue(manager.removeNear(at))
         assertEquals(0, manager.size)
         assertTrue(world.entities.isEmpty())

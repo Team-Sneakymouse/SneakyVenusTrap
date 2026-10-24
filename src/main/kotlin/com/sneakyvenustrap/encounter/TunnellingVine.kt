@@ -94,6 +94,33 @@ internal class TunnellingVine(private val view: GardenView, val target: java.uti
     private var index = 0
     private var age = 0
     private var caught = false
+    private var capturedAt = 0
+    private val restraint = org.bukkit.attribute.AttributeModifier(
+        org.bukkit.NamespacedKey("sneakyvenustrap", "vine_${java.util.UUID.randomUUID()}"),
+        -1.0, org.bukkit.attribute.AttributeModifier.Operation.MULTIPLY_SCALAR_1)
+    private var restrained: Player? = null
+    private val coils = mutableListOf<Entity>()
+
+    private fun wrap(player: Player) {
+        if (coils.isEmpty()) repeat(16) { coils += part(player.location, "vine_segment") }
+        val base = player.location.clone().add(0.0, 0.45, 0.0)
+        fun point(i: Int): Vector3f {
+            val t = i / 16f
+            val angle = t * Math.PI * 4.0
+            return Vector3f((0.48 * kotlin.math.cos(angle)).toFloat(), t * 1.05f,
+                (0.48 * kotlin.math.sin(angle)).toFloat())
+        }
+        coils.forEachIndexed { i, entity ->
+            entity.teleport(base)
+            val a = point(i); val d = point(i + 1).sub(a)
+            val length = d.length()
+            val rotation = Quaternionf().rotationTo(Vector3f(0f, 1f, 0f), d.div(length))
+            (entity as org.bukkit.entity.Display).apply {
+                interpolationDelay = 0
+                transformation = Transformation(a, rotation, Vector3f(0.7f, length * 16f / 10.2f, 0.7f), Quaternionf())
+            }
+        }
+    }
     private var erupted = false
     private var front: org.bukkit.entity.ItemDisplay? = null
     private val tipParts = mutableListOf<org.bukkit.entity.ItemDisplay>()
@@ -139,9 +166,12 @@ internal class TunnellingVine(private val view: GardenView, val target: java.uti
     }
 
     private fun tickOwned(player: Player?): Boolean {
-        if (player == null || !player.isOnline || player.world != view.origin.world) return false
+        if (player == null || !player.isOnline || player.isDead || player.world != view.origin.world ||
+            player.gameMode == org.bukkit.GameMode.CREATIVE || player.gameMode == org.bukkit.GameMode.SPECTATOR ||
+            player.isInsideVehicle || player.passengers.isNotEmpty()) return false
         age += 5
-        if (age > 220) return false
+        // Pursuit remains bounded; a caught target gets its own full thirty-second drag budget.
+        if ((!caught && age > 220) || (caught && age - capturedAt > 600)) return false
         if (phase == Phase.TRACKING && age in 10..20 && index > 0) {
             val suffix = VineTerrain.route(route[index - 1], player.location)
             if (suffix != null && index + suffix.size - 1 <= 24) route = route.take(index) + suffix.drop(1)
@@ -177,7 +207,6 @@ internal class TunnellingVine(private val view: GardenView, val target: java.uti
                     tipParts += part
                 }
             }
-            endpoint.world.spawnParticle(org.bukkit.Particle.COMPOSTER, endpoint, 18, 0.7, 0.3, 0.7, 0.02)
             endpoint.world.playSound(endpoint, "block.roots.break", 1f, 0.6f)
             return true
         }
@@ -185,9 +214,14 @@ internal class TunnellingVine(private val view: GardenView, val target: java.uti
         if (!caught) {
             if (player.location.distanceSquared(endpoint) > 2.25 || !prepare(player)) return false
             caught = true
+            capturedAt = age
+            restrained = player
+            player.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED)?.addModifier(restraint)
+                ?: return false
             phase = Phase.PULL
         }
         if (player.location.distanceSquared(view.origin) <= 36) return false
+        wrap(player)
         val delta = route.first().toVector().subtract(player.location.toVector()).setY(0)
         if (delta.lengthSquared() < 0.01) return false
         val step = delta.normalize().multiply(0.35)
@@ -206,9 +240,12 @@ internal class TunnellingVine(private val view: GardenView, val target: java.uti
     }
     fun close() {
         phase = Phase.DONE
+        restrained?.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED)?.removeModifier(restraint)
+        restrained = null
         releasePull()
         entities.forEach { it.remove() }
         view.entities.removeAll(entities.toSet())
         entities.clear()
+        coils.clear()
     }
 }

@@ -4,6 +4,20 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class PlantAttackTest {
+    @Test fun committedSnapHoldsItsClosedPoseWhenSwallowedTargetChangesWorld() {
+        val attack = PlantAttack()
+        attack.start(true)
+        repeat(10) { attack.tick(true) }
+        assertEquals(1f, attack.progress)
+        repeat(4) {
+            assertFalse(attack.tick(false))
+            assertEquals(PlantAttack.Phase.RECOVERY, attack.phase)
+            assertEquals(1f, attack.progress, "closed swallow hold must survive invalid exterior victim")
+        }
+        repeat(6) { attack.tick(false) }
+        assertEquals(PlantAttack.Phase.IDLE, attack.phase)
+    }
+
     @Test fun idleTicksCannotInventAnAttack() {
         val attack = PlantAttack()
         repeat(40) { assertFalse(attack.tick(true)) }

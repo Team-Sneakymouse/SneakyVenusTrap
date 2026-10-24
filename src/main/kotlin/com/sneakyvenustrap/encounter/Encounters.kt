@@ -18,7 +18,6 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
         var cycles = 0
         var swallowing = false
         val drama = com.sneakyvenustrap.service.PlantDrama()
-        var pruningAt = 240
         val inhale = InhalePull()
         val attack = com.sneakyvenustrap.service.PlantAttack()
         var aim: Location? = null
@@ -86,9 +85,6 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
                 garden.view.updateBar(players, false)
                 continue
             }
-            if (garden.age >= garden.pruningAt && players.isNotEmpty() && garden.vine == null && attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE) {
-                if (drama.prune()) garden.pruningAt = garden.age + 300
-            }
             if (!renderDrama(garden, players)) continue
             val activeVine = garden.vine
             if (activeVine != null) {
@@ -101,7 +97,7 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
                 }
             }
             if (garden.anchor != null && players.none { it.uniqueId == garden.anchor!!.first }) garden.anchor = null
-            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null && !garden.drama.lanesVisible) {
+            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null) {
                 val target = players.filter { it.location.distanceSquared(garden.view.origin) <= 49 }
                     .maxByOrNull { Noise.score(it.isSprinting, it.isSneaking, microphoneActive(it.uniqueId)) }
                 if (target != null) {
@@ -109,12 +105,10 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
                     garden.aim = target.location.clone().add(0.0, 1.0, 0.0)
                     garden.swallowing = garden.cycles++ % 2 == 1
                     attack.start(garden.swallowing, drama.raging)
-                    garden.view.origin.world.spawnParticle(if (garden.swallowing) Particle.SOUL else Particle.COMPOSTER,
-                        garden.view.mouths.first().location, 16, 0.7, 0.5, 0.7, 0.02)
                     sound(target.location, "warning", "entity.warden.tendril_clicks", 0.7f)
                 }
             }
-            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null && !garden.drama.lanesVisible && now >= garden.vineCooldown) {
+            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE && garden.vine == null && now >= garden.vineCooldown) {
                 val distant = players.filter { it.location.distanceSquared(garden.view.origin) > 49 }
                     .maxByOrNull { Noise.score(it.isSprinting, it.isSneaking, microphoneActive(it.uniqueId)) }
                 if (distant != null) {
@@ -133,6 +127,7 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
             val victim = garden.target?.let { plugin.server.getPlayer(it) }
             val valid = victim != null && victim.isOnline && victim.world == garden.view.origin.world && eligible(victim, garden)
             if (attack.phase != com.sneakyvenustrap.service.PlantAttack.Phase.IDLE) {
+                if (attack.tracking && valid) garden.aim = victim.location.clone().add(0.0, 1.0, 0.0)
                 val contact = attack.tick(valid)
                 if (attack.inhaling && valid) {
                     if (garden.anchor?.first != victim.uniqueId) stomachs.prepareAnchor(victim)?.let { garden.anchor = victim.uniqueId to it }
@@ -157,6 +152,7 @@ class Encounters(private val plugin: JavaPlugin, val stomachs: Stomachs = Stomac
                     sound(garden.aim!!, "bite", "entity.ravager.roar", 0.6f)
                 }
             }
+            if (attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.IDLE) garden.view.pose(null, attack)
             garden.view.updateBar(players, garden.swallowing && attack.phase == com.sneakyvenustrap.service.PlantAttack.Phase.WINDUP)
         }
     }

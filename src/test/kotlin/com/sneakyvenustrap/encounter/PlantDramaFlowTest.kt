@@ -30,7 +30,7 @@ class PlantDramaFlowTest {
         state.tick(0.5)
         repeat(4) { view.drama(state, emptyList()) }
         assertTrue(leaves.indices.any { before[it] != leaves[it].transformation }, "rage must visibly peel existing leaves")
-        assertEquals(19, view.entities.size)
+        assertEquals(40, view.entities.size)
         state.tick(1.0)
         assertTrue(state.raging)
         attack.start(true, state.raging)
@@ -40,36 +40,17 @@ class PlantDramaFlowTest {
         assertTrue(world.entities.isEmpty())
     }
 
-    @Test fun lanesWarnApplyBoundedHitsKeepOpenEscapeAndReuseDisplays() {
-        val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
+    @Test fun periodicClockCannotSpawnThornLanesOrGlitter() {
         val world = server.addSimpleWorld("Darkvale")
-        world.getChunkAt(0, 0).load()
-        val player = server.addPlayer()
-        player.gameMode = GameMode.SURVIVAL
-        player.teleport(Location(world, -2.5, 64.0, 0.5))
-        assertTrue(plugin.encounters.spawn(Location(world, 0.5, 64.0, 0.5)))
-        // Keep ordinary combat out of the setup; pruning is driven by the real encounter clock.
-        player.gameMode = GameMode.CREATIVE
-        server.scheduler.performTicks(235)
-        player.gameMode = GameMode.SURVIVAL
-        server.scheduler.performTicks(5)
-        assertEquals(30, world.entities.filterIsInstance<Display>().size)
-        assertEquals(1, world.entities.filterIsInstance<Interaction>().size)
-        val ids = world.entities.filterIsInstance<Display>().map { it.uniqueId }
-        server.scheduler.performTicks(15)
-        assertEquals(20.0, player.health, "full warning is harmless")
-        server.scheduler.performTicks(5)
-        assertEquals(18.0, player.health)
-        assertTrue(player.hasPotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS))
-        server.scheduler.performTicks(15)
-        assertEquals(18.0, player.health, "lane hit cooldown must prevent repeated five-tick damage")
-        player.teleport(Location(world, 2.0, 64.0, 0.5))
-        server.scheduler.performTicks(65)
-        assertEquals(18.0, player.health, "central escape is safe and no inhale overlaps hazards")
-        assertEquals(ids, world.entities.filterIsInstance<Display>().map { it.uniqueId })
-        assertFalse(plugin.encounters.stomachs.contains(player.uniqueId))
-        assertTrue(plugin.encounters.removeNear(player.location))
-        assertTrue(world.entities.filter { it !is org.bukkit.entity.Player }.isEmpty())
+        val view = GardenView(Location(world, 0.5, 64.0, 0.5), true)
+        view.build(); view.buildBundles()
+        val ids = view.entities.map { it.uniqueId }
+        val state = com.sneakyvenustrap.service.PlantDrama()
+        repeat(200) { state.tick(1.0); view.drama(state, emptyList()) }
+        assertEquals(ids, view.entities.map { it.uniqueId })
+        assertTrue(world.spawnedParticles.isEmpty())
+        view.close()
+        assertTrue(world.entities.isEmpty())
     }
 
     @Test fun baitAbsorbsBeforeDamageAndHoldsExposedContactForSixtyTicks() {
