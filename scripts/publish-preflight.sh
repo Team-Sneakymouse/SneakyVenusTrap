@@ -47,8 +47,8 @@ else
   if ! grep -q 'workflow_dispatch' "$publish_yml"; then
     err "$publish_yml missing workflow_dispatch (needed to re-run after secret fixes)"
   fi
-  if ! grep -q 'publishMavenPublicationToSneakyrpRepository' "$publish_yml"; then
-    err "$publish_yml missing publishMavenPublicationToSneakyrpRepository"
+  if ! grep -qE 'publishMavenPublicationToSneakyrpRepository|Team-Sneakymouse/ci/\.github/workflows/gradle-publish\.yml@' "$publish_yml"; then
+    err "$publish_yml must call Team-Sneakymouse/ci gradle-publish.yml or run publishMavenPublicationToSneakyrpRepository"
   fi
 fi
 
