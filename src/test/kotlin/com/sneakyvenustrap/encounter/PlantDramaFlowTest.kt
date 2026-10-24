@@ -8,13 +8,16 @@ import org.bukkit.entity.Interaction
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.mockbukkit.mockbukkit.MockBukkit
+import org.mockbukkit.mockbukkit.ServerMock
 
 class PlantDramaFlowTest {
+    private lateinit var server: ServerMock
+    @BeforeEach fun setup() { server = MockBukkit.mock() }
     @AfterEach fun cleanup() { MockBukkit.unmock() }
 
     @Test fun ragePeelsExistingLeavesWithoutAddingEntitiesAndKeepsWarnings() {
-        val server = MockBukkit.mock()
         val world = server.addSimpleWorld("Darkvale")
         val view = GardenView(Location(world, 0.5, 64.0, 0.5), true)
         view.build()
@@ -38,7 +41,6 @@ class PlantDramaFlowTest {
     }
 
     @Test fun lanesWarnApplyBoundedHitsKeepOpenEscapeAndReuseDisplays() {
-        val server = MockBukkit.mock()
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val world = server.addSimpleWorld("Darkvale")
         world.getChunkAt(0, 0).load()
@@ -71,7 +73,6 @@ class PlantDramaFlowTest {
     }
 
     @Test fun baitAbsorbsBeforeDamageAndHoldsExposedContactForSixtyTicks() {
-        val server = MockBukkit.mock()
         val plugin = MockBukkit.load(SneakyVenusTrap::class.java)
         val world = server.addSimpleWorld("Darkvale")
         world.getChunkAt(0, 0).load()
