@@ -29,9 +29,9 @@ class CombatAuthorizationTest {
         val origin = Location(world, 0.5, 64.0, 0.5)
         player.teleport(origin)
         assertTrue(plugin.encounters.spawn(origin))
-        server.scheduler.performTicks(100)
+        server.scheduler.performTicks(30)
         player.gameMode = GameMode.CREATIVE
-        server.scheduler.performTicks(20)
+        server.scheduler.performTicks(5)
         assertTrue(plugin.encounters.exposedAt(origin))
         return Triple(plugin, player, world.entities.filterIsInstance<Interaction>().first())
     }

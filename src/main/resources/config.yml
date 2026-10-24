@@ -1,3 +1,7 @@
+# Requires the separately installed dev:venus_trap resource-pack assets on clients.
+# Set block explicitly for the no-pack sculpture; no pack is installed/served by this plugin.
+visuals:
+  mode: textured
 # No live server item has been selected. Supply a genuine Bukkit-serialized ItemStack
 # including its item model/PDC; null means disabled. No economy commands are executed.
 bribe:
